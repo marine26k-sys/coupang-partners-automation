@@ -18,9 +18,17 @@ DAILY_POST_SYSTEM_PROMPT = """너는 스레드(Threads)용 '일상글'을 쓰는
 - 관점(1인칭 화자의 상황/기분)도 매번 무작위로 다르게 설정해.
 - 문체는 짧고 반말인 커뮤니티체로 써. 문장은 짧게 끊어 쓰고, 과한 격식체·설명체 금지.
 - 광고 느낌이 나면 안 돼. 상품이나 브랜드명은 직접 언급하지 마.
-- 입력으로 링크가 함께 주어지면, 글 맨 끝에 "이거임" "요기" "여기 있음" 같은 짧고 무심한 말투로 자연스럽게 링크를 곁들여. 절대 강조하거나 광고처럼 보이면 안 돼.
-- 인풋에 주제만 있고 링크가 없으면 링크 없이 글만 써.
-- 결과는 글 본문만 출력해. 설명이나 따옴표는 붙이지 마."""
+- [일상글] 본문에는 링크를 절대 넣지 마. 링크가 입력으로 주어지면, 별도 [댓글]에 "이거임" "요기" "여기 있음" 같은 짧고 무심한 말투 한마디와 함께 링크만 적어.
+- 인풋에 링크가 없으면 [댓글] 없이 [일상글]만 출력해.
+- 설명이나 따옴표는 붙이지 마.
+
+출력 형식은 아래처럼 정확히 맞춰:
+[일상글]
+(본문, 링크 절대 금지)
+
+링크가 있을 때만:
+[댓글]
+(짧은 한마디 + 링크)"""
 
 HOOK_POST_SYSTEM_PROMPT = """너는 쿠팡파트너스 제휴 마케팅용 스레드(Threads) 글을 쓰는 작가야. 아래 규칙을 반드시 지켜.
 
@@ -68,8 +76,11 @@ def generate_daily_post(topic: str = "랜덤", deeplink: str = "") -> str:
         generation_config={"temperature": 0.9},
     )
     content = resp.text.strip()
-    if deeplink and "쿠팡파트너스 활동의 일환" not in content:
-        content += FTC_DISCLOSURE
+    if deeplink:
+        if "[댓글]" not in content:
+            content += f"\n\n[댓글]\n이거임 {deeplink}"
+        if "쿠팡파트너스 활동의 일환" not in content:
+            content += FTC_DISCLOSURE
     return content
 
 
