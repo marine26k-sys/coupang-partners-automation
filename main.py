@@ -56,7 +56,7 @@ def run():
     deeplink = links[0]["shortenUrl"] if links else product.get("productUrl", plain_url)
 
     print("3) Gemini로 글 생성 중...")
-    daily_post = generate_daily_post("랜덤")
+    daily_post = generate_daily_post(keyword, deeplink)
     hook_post = generate_hook_and_recommend(
         product_name=product_name,
         product_features="(상품 검색 결과 기반)",
