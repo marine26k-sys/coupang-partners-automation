@@ -38,6 +38,7 @@ def send_draft_kakao(daily_post: str, hook_post: str, product_name: str, deeplin
 
     today = datetime.now().strftime("%Y-%m-%d")
     text = f"""[스레드 초안] {today} - {product_name}
+{deeplink}
 
 [일상글 - 위장용/필러]
 {daily_post}
