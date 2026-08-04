@@ -43,10 +43,7 @@ def send_draft_kakao(daily_post: str, hook_post: str, product_name: str, deeplin
 {daily_post}
 
 [후킹글 + 추천글]
-{hook_post}
-
-[딥링크]
-{deeplink}"""
+{hook_post}"""
 
     text = text[:1000]
 
