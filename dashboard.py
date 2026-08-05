@@ -67,7 +67,7 @@ def run():
         price_text = f"{price:,}원" if price else ""
 
         print(f"   -> 글 생성: {product_name}")
-        body = generate_dashboard_post(product_name, "(상품 검색 결과 기반)", price_text)
+        body = generate_dashboard_post(product_name, "(상품 검색 결과 기반)")
         comment = build_comment(deeplink)
 
         items.append({
