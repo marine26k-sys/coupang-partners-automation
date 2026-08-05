@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>초안 검토</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --sub: #6b7280;
+    --accent: #4f46e5;
+    --accent-bg: #eef2ff;
+    --danger: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --card: #1a1d23;
+      --border: #2a2e37;
+      --text: #f2f3f5;
+      --sub: #9aa0ab;
+      --accent: #818cf8;
+      --accent-bg: #1e2035;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 4px 0 2px; }
+  .meta { color: var(--sub); font-size: 13px; margin-bottom: 16px; }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .card-head { display: flex; gap: 12px; }
+  .card-head img {
+    width: 64px; height: 64px; object-fit: cover;
+    border-radius: 10px; background: var(--bg); flex-shrink: 0;
+  }
+  .card-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
+  .card-price { font-size: 15px; font-weight: 700; color: var(--accent); margin-top: 4px; }
+  .status-badge {
+    display: inline-block; font-size: 11px; padding: 2px 8px;
+    border-radius: 999px; background: var(--accent-bg); color: var(--accent);
+    margin-top: 6px;
+  }
+  .block-label { font-size: 12px; color: var(--sub); margin: 12px 0 4px; }
+  .block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .copy-row { display: flex; justify-content: flex-end; margin-top: 4px; }
+  .copy-btn {
+    font-size: 12px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .copy-btn.copied { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .status-row { display: flex; gap: 6px; margin-top: 12px; }
+  .status-btn {
+    flex: 1;
+    font-size: 12.5px;
+    padding: 8px 0;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .status-btn.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .empty { text-align: center; color: var(--sub); padding: 40px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>초안 검토</h1>
+  <div class="meta" id="meta">불러오는 중...</div>
+  <div class="tabs">
+    <div class="tab active" data-filter="전체">전체</div>
+    <div class="tab" data-filter="대기">대기</div>
+    <div class="tab" data-filter="바로가능">바로가능</div>
+    <div class="tab" data-filter="게시함">게시함</div>
+  </div>
+  <div id="list"></div>
+</div>
+
+<script>
+const STORAGE_KEY = "threads_dashboard_status";
+
+function loadStatusMap() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+function saveStatus(id, status) {
+  const map = loadStatusMap();
+  map[id] = status;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+}
+
+let currentFilter = "전체";
+let data = null;
+
+function itemId(item, idx) {
+  return item.deeplink || ("item-" + idx);
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  const statusMap = loadStatusMap();
+
+  const items = data.items.map((item, idx) => {
+    const id = itemId(item, idx);
+    const status = statusMap[id] || item.status || "대기";
+    return { ...item, id, status };
+  });
+
+  const filtered = currentFilter === "전체"
+    ? items
+    : items.filter(i => i.status === currentFilter);
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty">해당 상태의 초안이 없습니다.</div>';
+    return;
+  }
+
+  for (const item of filtered) {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const img = item.image
+      ? `<img src="${item.image}" alt="">`
+      : `<div style="width:64px;height:64px;border-radius:10px;background:var(--bg);flex-shrink:0;"></div>`;
+
+    card.innerHTML = `
+      <div class="card-head">
+        ${img}
+        <div>
+          <div class="card-title">${escapeHtml(item.productName)}</div>
+          <div class="card-price">${item.priceText || ""}</div>
+          <span class="status-badge">${item.status}</span>
+        </div>
+      </div>
+
+      <div class="block-label">본문</div>
+      <div class="block" data-copy="body">${escapeHtml(item.body)}</div>
+      <div class="copy-row"><button class="copy-btn" data-copy-target="body">복사</button></div>
+
+      <div class="block-label">댓글</div>
+      <div class="block" data-copy="comment">${escapeHtml(item.comment)}</div>
+      <div class="copy-row"><button class="copy-btn" data-copy-target="comment">복사</button></div>
+
+      <div class="status-row">
+        <button class="status-btn" data-status="대기">대기</button>
+        <button class="status-btn" data-status="바로가능">바로가능</button>
+        <button class="status-btn" data-status="게시함">게시함</button>
+      </div>
+    `;
+
+    card.querySelectorAll(".status-btn").forEach(btn => {
+      if (btn.dataset.status === item.status) btn.classList.add("on");
+      btn.addEventListener("click", () => {
+        saveStatus(item.id, btn.dataset.status);
+        render();
+      });
+    });
+
+    card.querySelectorAll(".copy-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.copyTarget;
+        const text = target === "body" ? item.body : item.comment;
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = "복사됨";
+          btn.classList.add("copied");
+          setTimeout(() => {
+            btn.textContent = "복사";
+            btn.classList.remove("copied");
+          }, 1200);
+        });
+      });
+    });
+
+    list.appendChild(card);
+  }
+}
+
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    currentFilter = tab.dataset.filter;
+    render();
+  });
+});
+
+fetch("data.json?t=" + Date.now())
+  .then(r => r.json())
+  .then(json => {
+    data = json;
+    document.getElementById("meta").textContent =
+      `${json.generatedAt} 생성 · 키워드: ${json.keyword} · 총 ${json.items.length}건`;
+    render();
+  })
+  .catch(() => {
+    document.getElementById("meta").textContent = "데이터를 불러오지 못했습니다.";
+  });
+</script>
+</body>
+</html>

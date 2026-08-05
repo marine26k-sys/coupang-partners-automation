@@ -46,11 +46,23 @@ HOOK_POST_SYSTEM_PROMPT = """너는 쿠팡파트너스 제휴 마케팅용 스�
 [2차글]
 (내용)"""
 
+DASHBOARD_POST_SYSTEM_PROMPT = """너는 쿠팡파트너스 상품 추천 글을 쓰는 작가야. 아래 규칙을 반드시 지켜.
+
+입력으로 상품명, 특징, 가격이 주어진다. 직접 써본 사람처럼 짧고 담백한 추천 글을 써.
+
+- 가격은 자연스럽게 언급해도 돼.
+- 과장광고나 실제와 다른 효능·효과를 단정적으로 말하지 마 (표시광고법 위반 소지 있음).
+- 반말 커뮤니티체, 3~5줄 이내로 짧게.
+- 결과는 글 본문만 출력해. 설명이나 따옴표, 링크는 붙이지 마."""
+
 _daily_model = genai.GenerativeModel(
     "gemini-2.5-flash", system_instruction=DAILY_POST_SYSTEM_PROMPT
 )
 _hook_model = genai.GenerativeModel(
     "gemini-2.5-flash", system_instruction=HOOK_POST_SYSTEM_PROMPT
+)
+_dashboard_model = genai.GenerativeModel(
+    "gemini-2.5-flash", system_instruction=DASHBOARD_POST_SYSTEM_PROMPT
 )
 
 
@@ -80,3 +92,16 @@ def generate_hook_and_recommend(product_name: str, product_features: str,
     content = resp.text.strip()
     content += _comment_block(deeplink)
     return content
+
+
+def generate_dashboard_post(product_name: str, product_features: str, price: str) -> str:
+    user_msg = f"상품명: {product_name}\n특징: {product_features}\n가격: {price}"
+    resp = _dashboard_model.generate_content(
+        user_msg,
+        generation_config={"temperature": 0.8},
+    )
+    return resp.text.strip()
+
+
+def build_comment(deeplink: str) -> str:
+    return f"{DISCLOSURE_TEXT}\n{deeplink}"
