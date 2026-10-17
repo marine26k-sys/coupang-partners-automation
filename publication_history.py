@@ -21,6 +21,8 @@ class History:
                 keyword TEXT, created REAL, updated REAL, status TEXT,
                 draft TEXT, publication TEXT, error_type TEXT)''')
             db.execute('CREATE INDEX IF NOT EXISTS recent_product ON runs(product_id,created)')
+            db.execute('CREATE TABLE IF NOT EXISTS insights(run_id TEXT PRIMARY KEY,captured REAL,metrics TEXT)')
+            db.execute('CREATE TABLE IF NOT EXISTS revisions(id INTEGER PRIMARY KEY,run_id TEXT,created REAL,draft TEXT)')
 
     @contextmanager
     def db(self):
@@ -101,17 +103,32 @@ class History:
                 'generation_failed':'초안 생성 실패','publication_uncertain':'게시 상태 확인 필요',
                 'deleted':'삭제됨'}
         cards=[]
+        with self.db() as db:
+            metrics = {r['run_id']: dict(r) for r in db.execute('SELECT * FROM insights')}
+            revisions = list(db.execute('SELECT * FROM revisions ORDER BY created DESC'))
         for r in self.records():
             draft=r['draft'] or {}; pair=draft.get('threadsPair') or draft.get('pair') or {}
             publication=r['publication'] or {}
             url=publication.get('permalink','')
             link=f'<a href="{esc(url)}" target="_blank" rel="noopener">게시물 보기 ↗</a>' if url.startswith('https://www.threads.com/') else ''
+            stats = metrics.get(r['id'])
+            performance = '성과 미수집'
+            if stats:
+                values = json.loads(stats['metrics'])
+                names = {'views':'조회','likes':'좋아요','replies':'댓글','reposts':'재게시','quotes':'인용','shares':'공유'}
+                performance = ' · '.join(f'{label} {values.get(key, "미제공")}' for key,label in names.items())
+                performance += ' (수집 ' + datetime.fromtimestamp(stats['captured']).strftime('%m-%d %H:%M') + ')'
+            alternatives = ''
+            for rev in revisions:
+                if rev['run_id'] == r['id']:
+                    pair_rev = json.loads(rev['draft'])['threadsPair']
+                    alternatives += '<details><summary>미발행 재작성 초안</summary><pre>' + esc(pair_rev['body']) + '</pre><pre>' + esc(pair_rev['reply']) + '</pre></details>'
             stamp=datetime.fromtimestamp(r['created'],timezone.utc).astimezone().strftime('%Y-%m-%d %H:%M')
             cards.append(f'''<article><small>{esc(stamp)} · {esc(r['keyword'])}</small>
                 <h2>{esc(r['product_name'])}</h2><b>{esc(labels.get(r['status'],r['status']))}</b> {link}
                 <details><summary>본문·첫 댓글 보기</summary><h3>본문</h3><pre>{esc(pair.get('body') or draft.get('dailyPost',''))}</pre>
                 <h3>첫 댓글</h3><pre>{esc(pair.get('reply') or draft.get('hookPost',''))}</pre></details>
-                <small>상품 ID {esc(r['product_id'])} · 오류 유형 {esc(r['error_type']) or '없음'}</small></article>''')
+                <p>{esc(performance)}</p>{alternatives}<small>이력 ID {esc(r["id"])} · 상품 ID {esc(r['product_id'])} · 오류 유형 {esc(r['error_type']) or '없음'}</small></article>''')
         target.parent.mkdir(parents=True,exist_ok=True)
         target.write_text('''<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>살림셀렉트 게시 이력</title>
         <style>body{font:16px/1.6 -apple-system,sans-serif;background:#f7f6ef;color:#173d2d;max-width:900px;margin:40px auto;padding:0 20px}article{background:white;border:1px solid #dedfd7;border-radius:16px;padding:24px;margin:18px 0}h2{font-size:20px}small{color:#666}pre{white-space:pre-wrap;font:inherit;color:#333}a{color:#1c6650}summary{cursor:pointer;margin:18px 0}</style>
