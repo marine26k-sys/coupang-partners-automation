@@ -116,10 +116,12 @@ GitHub Actions에는 이 로컬 게시 이력이 보존되지 않으므로 Threa
 
 ### 공개 프로필 상품 사이트
 
-살림셀렉트 Sites 원본은 인접한 `../sallim-select` 폴더에 있으며, 공개 상품 데이터는 `marine26k-sys/sallim-select-catalog` 저장소의 `catalog.json`입니다. 공개 데이터에는 상품명·가격·공식 이미지·본인 제휴 링크·목록 순서·수집 시각만 포함합니다. 인증 키·토큰·개인 게시 이력은 포함하지 않습니다.
+살림셀렉트 Sites 원본은 인접한 `../sallim-select` 폴더에 있으며, 공개 상품 데이터는 `marine26k-sys/sallim-select` 저장소의 `catalog.json`입니다. 공개 데이터에는 상품명·가격·공식 이미지·본인 제휴 링크·목록 순서·수집 시각만 포함합니다. 인증 키·토큰·개인 게시 이력은 포함하지 않습니다.
 
 `python catalog.py --publish`는 골드박스 8개, 주방 베스트 8개, 생활용품 베스트 8개, 팬트리 검색 8개를 수집하고 본인 제휴 링크로 변환해 공개 목록을 갱신합니다. 기존 Mac 오전 9시·오후 6시 예약 실행에도 연결되어 있습니다. Mac이 켜져 있고 GitHub 인증이 유효해야 갱신됩니다. 사이트는 Mac이 꺼져도 마지막 공개 자료를 표시합니다. GitHub Actions나 추가 결제는 사용하지 않습니다.
 
 동일 상품 ID와 vendorItemId의 이전 관측일 가격이 있을 때만 가격 변화를 표시합니다. 첫날이나 옵션 식별이 안 되는 상품은 ‘가격 기록 수집 중’으로 표시하며 시장 최저가를 주장하지 않습니다. 사이트에서 상품 검색·카테고리 선택·가격 정렬·브라우저 내 관심 상품 저장이 가능합니다.
 
 참고 사이트 [todaydeal](https://github.com/HyaC1107/todaydeal)의 상품 모음 흐름을 참고하여 살림셀렉트 화면과 수집기를 새로 작성했습니다. 다른 계정의 제휴 링크나 사용 후기는 복사하지 않았습니다.
+
+공개 주소: https://marine26k-sys.github.io/sallim-select/ (GitHub Pages). Sites 기본 주소에 워크스페이스 이름과 chatgpt가 포함되어, 사용자 요청에 따라 공개 운영을 GitHub Pages로 이전했습니다. 공개 파일은 `../sallim-select-catalog` 로컬 폴더에서 `marine26k-sys/sallim-select`로 반영됩니다.
