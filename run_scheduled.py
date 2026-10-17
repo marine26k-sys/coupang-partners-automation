@@ -51,6 +51,14 @@ def main():
                 insights_output = f'성과 수집 exit={insights.returncode}\n' + insights.stdout
             except subprocess.TimeoutExpired:
                 insights_output = '성과 수집 시간 초과 (발행 결과 유지)\n'
+        catalog_output = ''
+        if '--check' not in sys.argv:
+            try:
+                catalog = subprocess.run([sys.executable, str(ROOT / 'catalog.py'), '--publish'],
+                    cwd=ROOT, capture_output=True, text=True, timeout=120, env=run_env)
+                catalog_output = f'상품 사이트 갱신 exit={catalog.returncode}\n' + catalog.stdout
+            except subprocess.TimeoutExpired:
+                catalog_output = '상품 사이트 갱신 시간 초과 (이전 자료 유지)\n'
         log = folder / 'scheduler.log'
         if log.exists() and log.stat().st_size > 1_000_000:
             log.replace(folder / 'scheduler.previous.log')
@@ -58,7 +66,7 @@ def main():
         with log.open('a') as out:
             os.chmod(log, 0o600)
             out.write(f'[{stamp}] exit={result.returncode}\n')
-            out.write(redact(result.stdout + result.stderr + insights_output, values) + '\n')
+            out.write(redact(result.stdout + result.stderr + insights_output + catalog_output, values) + '\n')
         if result.returncode:
             print('실행 실패: 보호된 로컬 기록을 확인하세요.')
         else:
