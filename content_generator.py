@@ -6,6 +6,17 @@ import os
 from google import genai
 from google.genai import types
 
+FACTUAL_RULES = """
+최우선 사실성 규칙:
+실제 사용·구매·추천받은 경험, 친구·가족의 일화, 인용 후기, 체험담을 만들지 마.
+가상 상황극이나 1인칭 경험담도 금지한다. 일반적인 구매 전 고민이나 확인 질문으로 쓴다.
+입력된 상품명에 직접 있는 구성·규격 외에는 장점, 품질, 사용감, 효과를 추정하지 마.
+예: 잇몸이 안 아프다, 개운하다, 튼튼하다, 편하다 등 확인되지 않은 주장은 금지한다.
+의학·건강 권고나 출처 없는 수치 기준도 만들지 마.
+정보가 부족하면 확인할 항목으로 제안하고, 직접 쓰거나 효능을 확인한 것처럼 말하지 마.
+"""
+
+
 class TextModel:
     def __init__(self, instruction):
         self.instruction = instruction
@@ -13,9 +24,9 @@ class TextModel:
     def generate_content(self, text, generation_config):
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         response = client.models.generate_content(
-            model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
+            model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash"),
             contents=text,
-            config=types.GenerateContentConfig(system_instruction=self.instruction,
+            config=types.GenerateContentConfig(system_instruction=self.instruction + FACTUAL_RULES,
                                                **generation_config),
         )
         if not response.text:
@@ -32,7 +43,7 @@ def _comment_block(deeplink: str) -> str:
 DAILY_POST_SYSTEM_PROMPT = """너는 스레드(Threads)용 '일상글'을 쓰는 작가야. 아래 규칙을 반드시 지켜.
 
 - 입력으로 주어진 주제에서 연상되는 키워드를 먼저 떠올리고, 그걸 바탕으로 일반적인 상황을 소개해. 실제 사용 경험을 꾸며내지 마.
-- 글 타입은 다음 중 매번 무작위로 하나를 골라서 써: 공감형 하소연, 소소한 발견/꿀팁 공유, 자문자답형 혼잣말, 짧은 에피소드 회고.
+- 글 타입은 다음 중 매번 무작위로 하나를 골라서 써: 공감형 하소연, 소소한 발견/꿀팁 공유, 자문자답형 혼잣말, 구매 전 확인 질문.
 - 관점(1인칭 화자의 상황/기분)도 매번 무작위로 다르게 설정해.
 - 문체는 짧고 반말인 커뮤니티체로 써. 문장은 짧게 끊어 쓰고, 과한 격식체·설명체 금지.
 - 광고 느낌이 나면 안 돼. 상품이나 브랜드명, 링크는 절대 본문에 넣지 마.
@@ -44,7 +55,7 @@ HOOK_POST_SYSTEM_PROMPT = """너는 쿠팡파트너스 제휴 마케팅용 스�
 
 [1차 글 - 후킹용]
 - 밈/드립 스타일로 짧고 임팩트 있게 써서 시선을 끄는 게 목적이야.
-- 상품을 대놓고 광고하지 말고, 상황극이나 드립으로 궁금증을 유발해.
+- 상품을 대놓고 광고하지 말고, 일반적인 고민이나 질문으로 궁금증을 유발해. 실제 경험담 형식은 쓰지 마.
 - 반말 커뮤니티체, 이모지는 절제해서 1~2개만.
 
 [2차 글 - 추천형]
