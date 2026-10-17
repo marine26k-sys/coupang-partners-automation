@@ -1,63 +1,53 @@
-name: threads-automation
-
+name: 쿠팡파트너스 초안 자동화
 on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 실행 모드
+        type: choice
+        options: [demo, draft, kakao]
+        default: demo
   schedule:
-    - cron: "0 0 * * *"
-    - cron: "0 9 * * *"
-    - cron: "0 23 * * *"
-  workflow_dispatch: {}
-
+    - cron: '0 0,9 * * *'
 permissions:
-  contents: write
-
+  contents: read
+concurrency:
+  group: partners-drafts
+  cancel-in-progress: false
 jobs:
-  kakao:
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 0 * * *' || github.event.schedule == '0 9 * * *'
+  draft:
+    if: github.event_name == 'workflow_dispatch' || vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
+          python-version: '3.12'
+          cache: pip
       - run: pip install -r requirements.txt
-
-      - run: python main.py
+      - name: 테스트
+        run: python -m unittest discover -s tests -v
+      - name: 초안 생성
         env:
+          RUN_MODE: ${{ inputs.mode || 'kakao' }}
           COUPANG_ACCESS_KEY: ${{ secrets.COUPANG_ACCESS_KEY }}
           COUPANG_SECRET_KEY: ${{ secrets.COUPANG_SECRET_KEY }}
-          COUPANG_VENDOR_ID: ${{ secrets.COUPANG_VENDOR_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SEARCH_KEYWORDS: ${{ secrets.SEARCH_KEYWORDS }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+          SEARCH_KEYWORDS: ${{ vars.SEARCH_KEYWORDS || '주방 정리,수납 정리,생활용품' }}
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
           KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
-          KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
           KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
-
-  dashboard:
-    if: github.event.schedule == '0 23 * * *'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+        run: |
+          case "$RUN_MODE" in
+            demo) python main.py --demo ;;
+            draft) python main.py --no-send ;;
+            kakao) python main.py ;;
+            *) exit 1 ;;
+          esac
+      - uses: actions/upload-artifact@v4
         with:
-          python-version: "3.12"
-
-      - run: pip install -r requirements.txt
-
-      - run: python dashboard.py
-        env:
-          COUPANG_ACCESS_KEY: ${{ secrets.COUPANG_ACCESS_KEY }}
-          COUPANG_SECRET_KEY: ${{ secrets.COUPANG_SECRET_KEY }}
-          COUPANG_VENDOR_ID: ${{ secrets.COUPANG_VENDOR_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SEARCH_KEYWORDS: ${{ secrets.SEARCH_KEYWORDS }}
-
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data.json
-          git diff --cached --quiet || git commit -m "대시보드 데이터 갱신 $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push
+          name: partners-draft
+          path: artifacts/draft.json
+          retention-days: 7

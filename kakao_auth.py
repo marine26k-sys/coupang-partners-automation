@@ -6,9 +6,11 @@
 
 import os
 import sys
+import subprocess
+from urllib.parse import urlencode, urlparse, parse_qs
 import webbrowser
 import requests
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 
 load_dotenv()
 
@@ -16,11 +18,10 @@ REST_API_KEY = os.environ["KAKAO_REST_API_KEY"]
 CLIENT_SECRET = os.environ.get("KAKAO_CLIENT_SECRET", "")
 REDIRECT_URI = os.environ["KAKAO_REDIRECT_URI"]
 
-AUTH_URL = (
-    "https://kauth.kakao.com/oauth/authorize"
-    f"?client_id={REST_API_KEY}&redirect_uri={REDIRECT_URI}"
-    "&response_type=code&scope=talk_message"
-)
+AUTH_URL = "https://kauth.kakao.com/oauth/authorize?" + urlencode({
+    "client_id": REST_API_KEY, "redirect_uri": REDIRECT_URI,
+    "response_type": "code", "scope": "talk_message",
+})
 
 
 def main():
@@ -32,7 +33,10 @@ def main():
         webbrowser.open(AUTH_URL)
         redirected = input("\n로그인 후 이동된 페이지의 주소창 URL 전체를 붙여넣으세요: ").strip()
 
-    code = redirected.split("code=")[1].split("&")[0]
+    params = parse_qs(urlparse(redirected).query)
+    if not params.get("code"):
+        raise SystemExit("인증 코드가 없습니다. 카카오 로그인 동의 후 주소를 확인하세요.")
+    code = params["code"][0]
 
     data = {
         "grant_type": "authorization_code",
@@ -51,8 +55,12 @@ def main():
     resp.raise_for_status()
     tokens = resp.json()
 
-    print("\n발급 완료! 아래 값을 .env의 KAKAO_REFRESH_TOKEN에 넣으세요:")
-    print(tokens["refresh_token"])
+    set_key(".env", "KAKAO_REFRESH_TOKEN", tokens["refresh_token"])
+    os.chmod(".env", 0o600)
+    subprocess.run(["gh", "secret", "set", "KAKAO_REFRESH_TOKEN", "--repo",
+                    "marine26k-sys/coupang-partners-automation"],
+                   input=tokens["refresh_token"], text=True, check=True)
+    print("인증 완료. 토큰을 로컬 및 GitHub Secrets에 저장했습니다.")
 
 
 if __name__ == "__main__":

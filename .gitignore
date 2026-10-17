@@ -2,3 +2,8 @@
 run_log.txt
 __pycache__/
 *.pyc
+
+.venv/
+artifacts/
+.env.*
+!.env.example

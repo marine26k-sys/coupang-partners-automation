@@ -16,8 +16,7 @@ DOMAIN = "https://api-gateway.coupang.com"
 
 
 def _generate_hmac(method: str, path: str, query: str, secret_key: str, access_key: str) -> str:
-    datetime_gmt = datetime.now(timezone.utc).strftime("%y%m%d") + "T" + \
-        datetime.now(timezone.utc).strftime("%H%M%S") + "Z"
+    datetime_gmt = datetime.now(timezone.utc).strftime("%y%m%dT%H%M%SZ")
     message = datetime_gmt + method + path + query
     signature = hmac.new(
         bytes(secret_key, "utf-8"),
@@ -45,7 +44,10 @@ class CoupangPartnersClient:
         full_url = DOMAIN + path + (("?" + query) if query else "")
         resp = requests.request(method, full_url, headers=headers, json=body, timeout=15)
         resp.raise_for_status()
-        return resp.json()
+        result = resp.json()
+        if result.get("rCode") not in (None, "0", 0):
+            raise RuntimeError(f"쿠팡 API 오류 코드: {result.get('rCode')}")
+        return result
 
     def search_products(self, keyword: str, limit: int = 10) -> list:
         path = "/v2/providers/affiliate_open_api/apis/openapi/products/search"

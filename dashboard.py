@@ -61,7 +61,9 @@ def run():
 
     items = []
     for product, plain_url in zip(products, plain_urls):
-        deeplink = deeplink_map.get(plain_url, product.get("productUrl", plain_url))
+        deeplink = deeplink_map.get(plain_url)
+        if not deeplink:
+            raise RuntimeError("제휴 링크 생성 실패")
         product_name = product.get("productName", "")
         price = product.get("productPrice", "")
         price_text = f"{price:,}원" if price else ""

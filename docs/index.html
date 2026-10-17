@@ -172,7 +172,7 @@ function render() {
     card.className = "card";
 
     const img = item.image
-      ? `<img src="${item.image}" alt="">`
+      ? `<img src="${escapeHtml(item.image)}" alt="">`
       : `<div style="width:64px;height:64px;border-radius:10px;background:var(--bg);flex-shrink:0;"></div>`;
 
     card.innerHTML = `
@@ -180,8 +180,8 @@ function render() {
         ${img}
         <div>
           <div class="card-title">${escapeHtml(item.productName)}</div>
-          <div class="card-price">${item.priceText || ""}</div>
-          <span class="status-badge">${item.status}</span>
+          <div class="card-price">${escapeHtml(item.priceText || "")}</div>
+          <span class="status-badge">${escapeHtml(item.status)}</span>
         </div>
       </div>
 

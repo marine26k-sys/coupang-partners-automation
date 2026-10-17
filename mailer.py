@@ -5,7 +5,7 @@
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 TOKEN_URL = "https://kauth.kakao.com/oauth/token"
 SEND_URL = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
@@ -36,11 +36,11 @@ def _get_access_token() -> str:
 def send_draft_kakao(daily_post: str, hook_post: str, product_name: str, deeplink: str):
     access_token = _get_access_token()
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d")
     text = f"""[스레드 초안] {today} - {product_name}
 {deeplink}
 
-[일상글 - 위장용/필러]
+[주제 소개 초안]
 {daily_post}
 
 [후킹글 + 추천글]
@@ -64,5 +64,7 @@ def send_draft_kakao(daily_post: str, hook_post: str, product_name: str, deeplin
         timeout=15,
     )
     resp.raise_for_status()
+    if resp.json().get("result_code") != 0:
+        raise RuntimeError("카카오 메시지 전송 실패")
 
     print("카카오톡 '나에게 보내기' 발송 완료")
