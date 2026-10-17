@@ -36,8 +36,12 @@ def main():
         args = [sys.executable, str(ROOT / 'main.py')]
         if '--check' in sys.argv:
             args.append('--check')
+        now = datetime.now(ZoneInfo('Asia/Seoul'))
+        slot = '18' if now.hour >= 18 else '09'
+        run_env = {**os.environ, **{k:v for k,v in values.items() if v is not None}}
+        run_env['AUTOMATION_RUN_KEY'] = now.strftime('%Y-%m-%d') + '-' + slot
         result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
-                                timeout=540, env={**os.environ, **{k:v for k,v in values.items() if v is not None}})
+                                timeout=540, env=run_env)
         log = folder / 'scheduler.log'
         if log.exists() and log.stat().st_size > 1_000_000:
             log.replace(folder / 'scheduler.previous.log')

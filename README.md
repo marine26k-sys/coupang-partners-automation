@@ -1,7 +1,7 @@
 # 쿠팡파트너스 초안 자동화
 
 상품 검색 → 제휴 링크 → Gemini 초안 → 카카오 나에게 보내기.
-Threads 자동 게시 기능은 아직 포함하지 않습니다.
+Threads 자동 게시 기능은 별도 계정 연결 후 `THREADS_ENABLED=true`로 활성화합니다. 현재는 인증 대기 상태입니다.
 
 ## 로컬 실행
 
@@ -61,3 +61,26 @@ Mac의 시간대는 한국시간이어야 하며, 로그인된 Mac과 인터넷 
 GitHub 예약 활성화 변수와 로컬 활성화 값은 별개이며, 두 실행을 동시에 켜면 중복 발송됩니다.
 GitHub Actions의 결제·사용 한도 문제는 별도로 해결해야 합니다.
 로컬에서 갱신된 카카오 토큰은 GitHub Secrets와 다를 수 있으므로, Actions로 전환 전 `setup_credentials.py`로 다시 동기화하세요.
+
+
+## Threads 자동발행
+
+Threads 공식 API용 Meta 앱과 게시할 Threads 계정의 권한 연결이 필요합니다.
+필요한 권한은 `threads_basic`, `threads_content_publish`입니다.
+앱 개발자 로그인과 실제 게시할 Threads 계정 로그인은 별개입니다.
+공식 API 참고: https://www.postman.com/meta/threads/documentation/dht3nzz/threads-api
+
+로컬 `.env`에 `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN`,
+`THREADS_TOKEN_EXPIRES_AT`(Unix 초), `THREADS_TOKEN_REFRESHED_AT`(Unix 초)를 보호 저장합니다.
+최초 토큰과 앱 시크릿을 보호된 `.env`에 저장한 후 `python threads_connect.py`로 장기 토큰을 교환·저장할 수 있습니다.
+장기 토큰 연결과 실제 계정 검증을 마친 뒤 `THREADS_ENABLED=true`로 켭니다.
+토큰 만료 7일 전부터 실행 시 갱신하고 로컬 설정에 저장합니다. 만료되거나 권한이 철회되면 재인증이 필요합니다.
+
+활성화하면 기존 Mac 오전 9시·오후 6시 예약이 상품 검색 → 글 생성 → Threads 게시 → 카카오 알림을 실행합니다.
+게시 형식은 상품명 기반 소개·제휴 고지·제휴 링크를 포함한 500자 이내 단일 텍스트 글입니다.
+`--demo`, `--no-send`, `--check`는 공개 게시하지 않습니다.
+게시 이력은 `artifacts/threads.sqlite3`에 저장하며, 같은 계정·같은 예약 시간은 중복 게시하지 않습니다.
+게시 도중 연결이 끊기는 등 결과가 불확실하면 자동 재시도를 멈춥니다. 해당 계정에서 실제 게시 여부를 확인한 뒤 복구해야 합니다.
+중복 방지 기록이므로 운영 중 이 파일을 삭제하지 마세요.
+현재 Threads 연결·실제 게시 검증은 완료되지 않았으며, 자동발행 기본값은 OFF입니다.
+GitHub Actions에는 이 로컬 게시 이력이 보존되지 않으므로 Threads 게시를 연결하지 않았습니다.

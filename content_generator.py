@@ -125,3 +125,15 @@ def generate_dashboard_post(product_name: str, product_features: str) -> str:
 
 def build_comment(deeplink: str) -> str:
     return f"{DISCLOSURE_TEXT}\n{deeplink}"
+
+
+def generate_threads_post(product_name: str, deeplink: str) -> str:
+    model = TextModel('상품명을 바탕으로 Threads 상품 소개 본문만 250자 이내로 작성해. '
+                      '입력에 명시된 사실만 쓰고 가격, 후기, 효능, 사용담을 만들지 마. '
+                      '링크, 제목, 댓글 표시 없이 담백한 반말 2~4문장으로 써.')
+    response = model.generate_content(f'확인된 상품명: {product_name}',
+                                      {'temperature': 0.4})
+    text = f'{DISCLOSURE_TEXT}\n\n{response.text.strip()}\n\n{deeplink}'
+    if len(text) > 500:
+        raise ValueError('Threads 게시글이 500자를 초과했습니다. 자동으로 잘라 게시하지 않습니다.')
+    return text

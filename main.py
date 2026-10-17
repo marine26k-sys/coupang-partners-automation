@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from coupang_api import CoupangPartnersClient
-from content_generator import generate_daily_post, generate_hook_and_recommend
+from content_generator import generate_daily_post, generate_hook_and_recommend, generate_threads_post
 from mailer import send_draft_kakao
 
 
@@ -28,11 +28,14 @@ def run():
     parser = argparse.ArgumentParser()
     parser.add_argument("--demo", action="store_true", help="API 호출 없이 샘플 초안 저장")
     parser.add_argument("--check", action="store_true", help="설정 유무만 확인")
-    parser.add_argument("--no-send", action="store_true", help="카카오 전송 없이 초안 저장")
+    parser.add_argument("--no-send", action="store_true", help="공개 게시·카카오 전송 없이 초안 저장")
     args = parser.parse_args()
+    threads_enabled = os.environ.get('THREADS_ENABLED', '').lower() == 'true' and not args.no_send
     required = ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "GEMINI_API_KEY", "SEARCH_KEYWORDS"]
     if not args.no_send:
         required += ["KAKAO_REST_API_KEY", "KAKAO_REFRESH_TOKEN"]
+    if threads_enabled:
+        required += ['THREADS_ACCESS_TOKEN', 'THREADS_USER_ID', 'THREADS_TOKEN_EXPIRES_AT']
     if args.demo:
         from content_generator import DISCLOSURE_TEXT
         draft = {"demo": True, "productName": "샘플 수납용품 (실제 상품 아님)",
@@ -48,6 +51,11 @@ def run():
     if args.check:
         print("필수 설정 확인 완료 (API 연결 검증은 별도)")
         return
+    if threads_enabled and os.environ.get('AUTOMATION_RUN_KEY'):
+        from threads_api import published_for_run
+        if published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY']):
+            print('이 예약 시간의 Threads 게시가 이미 완료돼 중복 실행을 건너뜁니다.')
+            return
     print("1) 상품 검색 중...")
     keyword = pick_keyword()
     client = CoupangPartnersClient()
@@ -93,13 +101,33 @@ def run():
     )
 
     Path("artifacts").mkdir(exist_ok=True)
-    Path("artifacts/draft.json").write_text(json.dumps({
+    draft = {
         "demo": False, "productName": product_name, "deeplink": deeplink,
         "dailyPost": daily_post, "hookPost": hook_post,
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    }
+    draft_path = Path('artifacts/draft.json')
+    if threads_enabled:
+        draft['threadsPost'] = generate_threads_post(product_name, deeplink)
+    draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
+    threads_result = None
+    if threads_enabled:
+        from threads_api import publish_text, ThreadsError
+        print('4) Threads 게시 중...')
+        try:
+            threads_result = publish_text(draft['threadsPost'], os.environ.get('AUTOMATION_RUN_KEY'))
+        except ThreadsError:
+            send_draft_kakao('Threads 자동발행에 실패했습니다. 초안은 저장됐습니다. 게시 여부를 확인해주세요.',
+                             hook_post, product_name, deeplink)
+            raise
+        draft['threadsPublication'] = threads_result
+        draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
     if not args.no_send:
         print("4) 카카오톡 발송 중...")
-        send_draft_kakao(daily_post, hook_post, product_name, deeplink)
+        if threads_result:
+            send_draft_kakao('Threads 발행 완료\n' + threads_result.get('permalink', ''),
+                             draft['threadsPost'], product_name, deeplink)
+        else:
+            send_draft_kakao(daily_post, hook_post, product_name, deeplink)
     print("초안 생성 완료: artifacts/draft.json")
 
 
