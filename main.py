@@ -21,7 +21,8 @@ def pick_keyword() -> str:
     keywords = [k.strip() for k in os.environ.get("SEARCH_KEYWORDS", "").split(",") if k.strip()]
     if not keywords:
         raise ValueError(".env의 SEARCH_KEYWORDS를 최소 1개 이상 설정해주세요.")
-    return random.choice(keywords)
+    from publication_history import History
+    return History().next_keyword(keywords)
 
 
 def run():
@@ -53,10 +54,13 @@ def run():
         return
     if threads_enabled and os.environ.get('AUTOMATION_RUN_KEY'):
         from threads_api import published_for_run
-        if (published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'])
-                and published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'] + ':reply')):
-            print('이 예약 시간의 Threads 게시가 이미 완료돼 중복 실행을 건너뜁니다.')
-            return
+        prior_root = published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'])
+        if prior_root:
+            prior_reply = published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'] + ':reply')
+            if prior_reply:
+                print('이 예약 시간의 Threads 게시가 이미 완료돼 중복 실행을 건너뜁니다.')
+                return
+            raise RuntimeError('이 예약의 본문만 게시돼 있습니다. 저장된 초안으로 댓글 복구가 필요합니다.')
     print("1) 상품 검색 중...")
     keyword = pick_keyword()
     client = CoupangPartnersClient()
@@ -66,71 +70,92 @@ def run():
         print(f"'{keyword}' 검색 결과가 없습니다.")
         return
 
-    product = random.choice(products)
-    product_name = product.get("productName", "")
-    price = f"{product.get('productPrice', ''):,}원" if product.get("productPrice") else ""
+    from publication_history import History
+    history = History()
+    random.shuffle(products)
+    history_id, product = history.reserve(products, keyword, os.environ.get('AUTOMATION_RUN_KEY'),
+                                           int(os.environ.get('PRODUCT_COOLDOWN_DAYS', '30')))
+    if product is None:
+        print('검색된 상품이 모두 최근 게시·선택 이력에 있어 이번 실행은 건너뜁니다.')
+        return
+    stage = 'generation'
+    try:
+        product_name = product.get("productName", "")
+        price = f"{product.get('productPrice', ''):,}원" if product.get("productPrice") else ""
 
-    product_id = product.get("productId")
-    tracked_params = parse_qs(urlparse(product.get("productUrl", "")).query)
-    item_id = tracked_params.get("itemId", [None])[0]
-    vendor_item_id = tracked_params.get("vendorItemId", [None])[0]
+        product_id = product.get("productId")
+        tracked_params = parse_qs(urlparse(product.get("productUrl", "")).query)
+        item_id = tracked_params.get("itemId", [None])[0]
+        vendor_item_id = tracked_params.get("vendorItemId", [None])[0]
 
-    plain_url = f"https://www.coupang.com/vp/products/{product_id}"
-    params = []
-    if item_id:
-        params.append(f"itemId={item_id}")
-    if vendor_item_id:
-        params.append(f"vendorItemId={vendor_item_id}")
-    if params:
-        plain_url += "?" + "&".join(params)
+        plain_url = f"https://www.coupang.com/vp/products/{product_id}"
+        params = []
+        if item_id:
+            params.append(f"itemId={item_id}")
+        if vendor_item_id:
+            params.append(f"vendorItemId={vendor_item_id}")
+        if params:
+            plain_url += "?" + "&".join(params)
 
-    print(f"   -> 선택된 상품: {product_name}")
+        print(f"   -> 선택된 상품: {product_name}")
 
-    print("2) 딥링크 생성 중...")
-    links = client.create_deeplinks([plain_url], sub_id="threads_auto")
-    if not links or not links[0].get("shortenUrl"):
-        raise RuntimeError("제휴 링크 생성 실패: 일반 상품 링크로 대체하지 않습니다.")
-    deeplink = links[0]["shortenUrl"]
+        print("2) 딥링크 생성 중...")
+        links = client.create_deeplinks([plain_url], sub_id="threads_auto")
+        if not links or not links[0].get("shortenUrl"):
+            raise RuntimeError("제휴 링크 생성 실패: 일반 상품 링크로 대체하지 않습니다.")
+        deeplink = links[0]["shortenUrl"]
 
-    print("3) Gemini로 글 생성 중...")
-    daily_post = generate_daily_post(keyword, deeplink)
-    hook_post = generate_hook_and_recommend(
-        product_name=product_name,
-        product_features="(상품 검색 결과 기반)",
-        price=price,
-        deeplink=deeplink,
-    )
+        print("3) Gemini로 글 생성 중...")
+        daily_post = generate_daily_post(keyword, deeplink)
+        hook_post = generate_hook_and_recommend(
+            product_name=product_name,
+            product_features="(상품 검색 결과 기반)",
+            price=price,
+            deeplink=deeplink,
+        )
 
-    Path("artifacts").mkdir(exist_ok=True)
-    draft = {
-        "demo": False, "productName": product_name, "deeplink": deeplink,
-        "dailyPost": daily_post, "hookPost": hook_post,
-    }
-    draft_path = Path('artifacts/draft.json')
-    if threads_enabled:
-        draft['threadsPair'] = generate_threads_pair(product_name, deeplink)
-        draft['threadsPost'] = draft['threadsPair']['body'] + '\n\n[첫 댓글]\n' + draft['threadsPair']['reply']
-    draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
-    threads_result = None
-    if threads_enabled:
-        from threads_api import publish_pair, ThreadsError
-        print('4) Threads 게시 중...')
-        try:
-            threads_result = publish_pair(draft['threadsPair'], os.environ.get('AUTOMATION_RUN_KEY'))
-        except ThreadsError:
-            send_draft_kakao('Threads 자동발행에 실패했습니다. 초안은 저장됐습니다. 게시 여부를 확인해주세요.',
-                             hook_post, product_name, deeplink)
-            raise
-        draft['threadsPublication'] = threads_result
+        Path("artifacts").mkdir(exist_ok=True)
+        draft = {
+            "demo": False, "productId": str(product_id), "productName": product_name, "deeplink": deeplink, "keyword": keyword,
+            "dailyPost": daily_post, "hookPost": hook_post,
+        }
+        draft_path = Path('artifacts/draft.json')
+        if threads_enabled:
+            draft['threadsPair'] = generate_threads_pair(product_name, deeplink)
+            draft['threadsPost'] = draft['threadsPair']['body'] + '\n\n[첫 댓글]\n' + draft['threadsPair']['reply']
         draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
-    if not args.no_send:
-        print("4) 카카오톡 발송 중...")
-        if threads_result:
-            send_draft_kakao('Threads 발행 완료\n' + threads_result.get('permalink', ''),
-                             draft['threadsPost'], product_name, deeplink)
-        else:
-            send_draft_kakao(daily_post, hook_post, product_name, deeplink)
-    print("초안 생성 완료: artifacts/draft.json")
+        history.update(history_id, 'draft_ready', draft=draft)
+        threads_result = None
+        if threads_enabled:
+            from threads_api import publish_pair, ThreadsError
+            print('4) Threads 게시 중...')
+            stage = 'publication'
+            history.update(history_id, 'publishing')
+            try:
+                threads_result = publish_pair(draft['threadsPair'], os.environ.get('AUTOMATION_RUN_KEY'))
+            except ThreadsError:
+                send_draft_kakao('Threads 자동발행에 실패했습니다. 초안은 저장됐습니다. 게시 여부를 확인해주세요.',
+                                 hook_post, product_name, deeplink)
+                raise
+            history.update(history_id, 'published', publication=threads_result)
+            draft['threadsPublication'] = threads_result
+            draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
+        stage = 'notification'
+        if not args.no_send:
+            print("4) 카카오톡 발송 중...")
+            if threads_result:
+                send_draft_kakao('Threads 발행 완료\n' + threads_result.get('permalink', ''),
+                                 draft['threadsPost'], product_name, deeplink)
+            else:
+                send_draft_kakao(daily_post, hook_post, product_name, deeplink)
+        history.update(history_id, 'draft_ready' if args.no_send else 'notified', draft=draft)
+        print("초안 생성 완료: artifacts/draft.json")
+
+    except Exception as error:
+        status = {'generation':'generation_failed', 'publication':'publication_uncertain',
+                  'notification':'notification_failed'}[stage]
+        history.update(history_id, status, error_type=type(error).__name__)
+        raise
 
 
 if __name__ == "__main__":

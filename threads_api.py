@@ -1,4 +1,5 @@
 """Threads publishing with private credentials and a durable duplicate guard."""
+from contextlib import contextmanager
 import hashlib
 import os
 from pathlib import Path
@@ -71,6 +72,7 @@ class ThreadsClient:
         self.token = values['THREADS_ACCESS_TOKEN']
 
 
+@contextmanager
 def journal_connect(path=None):
     path = Path(path) if path else ROOT / 'artifacts/threads.sqlite3'
     path.parent.mkdir(exist_ok=True, parents=True)
@@ -81,7 +83,11 @@ def journal_connect(path=None):
         account TEXT, run_key TEXT, digest TEXT, state TEXT,
         container_id TEXT, post_id TEXT, permalink TEXT,
         PRIMARY KEY(account, run_key))''')
-    return db
+    try:
+        with db:
+            yield db
+    finally:
+        db.close()
 
 
 def published_for_run(user_id, run_key, journal_path=None):
