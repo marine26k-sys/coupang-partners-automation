@@ -137,3 +137,29 @@ def generate_threads_post(product_name: str, deeplink: str) -> str:
     if len(text) > 500:
         raise ValueError('Threads 게시글이 500자를 초과했습니다. 자동으로 잘라 게시하지 않습니다.')
     return text
+
+
+SHORT_DISCLOSURE = '[제휴광고] 링크 구매 시 수수료를 받습니다.'
+
+
+def generate_threads_pair(product_name: str, deeplink: str) -> dict:
+    import json
+    model = TextModel('Threads 본문과 첫 댓글을 JSON으로 작성해. '
+        '형식: {"hook":"본문", "reply":"댓글"}. '
+        'hook은 상품 카테고리의 구매 전 고민이나 질문으로 호기심을 끄는 반말 2~3문장, 180자 이내. '
+        '상품명·링크·고지·가짜 경험담 없이 쓰고 마지막에 상품 정보는 댓글에 정리했다고 안내해. '
+        'reply는 입력된 상품명과 명시된 구성만 담은 담백한 반말 200자 이내. '
+        '후기·효능·할인·판매량·최고 등의 주장을 만들지 마. 코드블록 없이 JSON만 출력해.')
+    response = model.generate_content('확인된 상품명: '+product_name, {'temperature': 0.4})
+    raw = response.text.strip()
+    if raw.startswith('```'):
+        raw = raw.removeprefix('```json').removeprefix('```').removesuffix('```').strip()
+    parsed = json.loads(raw)
+    hook, reply = parsed['hook'].strip(), parsed['reply'].strip()
+    if not hook or not reply or 'http' in hook or 'http' in reply:
+        raise ValueError('Threads 본문·댓글 형식이 올바르지 않습니다.')
+    pair = {'body': SHORT_DISCLOSURE+'\n\n'+hook,
+            'reply': DISCLOSURE_TEXT+'\n\n'+reply+'\n\n'+deeplink}
+    if any(len(value)>500 for value in pair.values()):
+        raise ValueError('Threads 본문 또는 댓글이 500자를 초과했습니다.')
+    return pair

@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from coupang_api import CoupangPartnersClient
-from content_generator import generate_daily_post, generate_hook_and_recommend, generate_threads_post
+from content_generator import generate_daily_post, generate_hook_and_recommend, generate_threads_post, generate_threads_pair
 from mailer import send_draft_kakao
 
 
@@ -53,7 +53,8 @@ def run():
         return
     if threads_enabled and os.environ.get('AUTOMATION_RUN_KEY'):
         from threads_api import published_for_run
-        if published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY']):
+        if (published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'])
+                and published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'] + ':reply')):
             print('이 예약 시간의 Threads 게시가 이미 완료돼 중복 실행을 건너뜁니다.')
             return
     print("1) 상품 검색 중...")
@@ -107,14 +108,15 @@ def run():
     }
     draft_path = Path('artifacts/draft.json')
     if threads_enabled:
-        draft['threadsPost'] = generate_threads_post(product_name, deeplink)
+        draft['threadsPair'] = generate_threads_pair(product_name, deeplink)
+        draft['threadsPost'] = draft['threadsPair']['body'] + '\n\n[첫 댓글]\n' + draft['threadsPair']['reply']
     draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
     threads_result = None
     if threads_enabled:
-        from threads_api import publish_text, ThreadsError
+        from threads_api import publish_pair, ThreadsError
         print('4) Threads 게시 중...')
         try:
-            threads_result = publish_text(draft['threadsPost'], os.environ.get('AUTOMATION_RUN_KEY'))
+            threads_result = publish_pair(draft['threadsPair'], os.environ.get('AUTOMATION_RUN_KEY'))
         except ThreadsError:
             send_draft_kakao('Threads 자동발행에 실패했습니다. 초안은 저장됐습니다. 게시 여부를 확인해주세요.',
                              hook_post, product_name, deeplink)

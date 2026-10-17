@@ -49,3 +49,28 @@ class ThreadsPublishingTests(unittest.TestCase):
         self.assertEqual(result['state'], 'published')
         self.assertEqual(publish_text(TEXT, 'slot-1', self.client, self.journal)['post_id'], 'post-1')
         self.assertEqual(self.client.request.call_count, 3)
+
+class ThreadsPairTests(unittest.TestCase):
+    def test_reply_targets_published_root_and_retry_does_not_duplicate(self):
+        from threads_api import publish_pair
+        from content_generator import SHORT_DISCLOSURE
+        with tempfile.TemporaryDirectory() as folder:
+            client = Mock(user_id='account-1')
+            client.request.side_effect = [
+                {'id':'root-container'}, {'id':'root-post'}, {'permalink':'root-url'},
+                {'id':'reply-container'}, {'id':'reply-post'}, {'permalink':'reply-url'}]
+            pair = {'body':SHORT_DISCLOSURE+'\n구매 전에 어떤 구성을 확인해?', 'reply':TEXT}
+            path = Path(folder)/'posts.sqlite3'
+            result = publish_pair(pair,'slot',client,path)
+            self.assertEqual(result['reply_id'],'reply-post')
+            self.assertEqual(client.request.call_args_list[3].args[2]['reply_to_id'],'root-post')
+            publish_pair(pair,'slot',client,path)
+            self.assertEqual(client.request.call_count,6)
+
+    def test_bad_reply_prevents_root_publication(self):
+        from threads_api import publish_pair
+        from content_generator import SHORT_DISCLOSURE
+        client = Mock(user_id='account-1')
+        with self.assertRaises(ThreadsError):
+            publish_pair({'body':SHORT_DISCLOSURE+'\n질문', 'reply':'고지 없는 링크'},client=client)
+        client.request.assert_not_called()

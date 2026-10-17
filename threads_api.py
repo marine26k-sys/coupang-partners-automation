@@ -93,9 +93,10 @@ def published_for_run(user_id, run_key, journal_path=None):
         return dict(row) if row else None
 
 
-def publish_text(text, run_key=None, client=None, journal_path=None):
-    from content_generator import DISCLOSURE_TEXT
-    if not text.startswith(DISCLOSURE_TEXT) or 'https://link.coupang.com/' not in text:
+def publish_text(text, run_key=None, client=None, journal_path=None, reply_to_id=None):
+    from content_generator import DISCLOSURE_TEXT, SHORT_DISCLOSURE
+    is_hook = text.startswith(SHORT_DISCLOSURE)
+    if not is_hook and (not text.startswith(DISCLOSURE_TEXT) or 'https://link.coupang.com/' not in text):
         raise ThreadsError('제휴 고지와 제휴 링크가 있는 글만 게시합니다.')
     if len(text) > 500:
         raise ThreadsError('Threads 글이 500자를 초과했습니다. 초안만 저장합니다.')
@@ -115,7 +116,7 @@ def publish_text(text, run_key=None, client=None, journal_path=None):
             raise ThreadsError('동일 실행의 게시가 이미 시작됐습니다.') from None
     # A failed/uncertain publish remains journaled. Do not blindly retry public posts.
     container = client.request('POST', client.user_id + '/threads',
-                               {'media_type': 'TEXT', 'text': text})
+                               {'media_type': 'TEXT', 'text': text, **({'reply_to_id': reply_to_id} if reply_to_id else {})})
     container_id = container.get('id')
     if not container_id:
         raise ThreadsError('Threads 게시 컨테이너 ID가 없습니다.')
@@ -139,3 +140,16 @@ def publish_text(text, run_key=None, client=None, journal_path=None):
         db.execute('UPDATE posts SET permalink=? WHERE account=? AND run_key=?',
                    (permalink, str(client.user_id), run_key))
     return {'post_id': post_id, 'permalink': permalink, 'state': 'published'}
+
+
+def publish_pair(pair, run_key=None, client=None, journal_path=None):
+    from content_generator import DISCLOSURE_TEXT, SHORT_DISCLOSURE
+    if not pair['body'].startswith(SHORT_DISCLOSURE) or not pair['reply'].startswith(DISCLOSURE_TEXT):
+        raise ThreadsError('본문과 댓글의 제휴 고지가 필요합니다.')
+    if 'https://link.coupang.com/' not in pair['reply'] or any(len(v)>500 for v in pair.values()):
+        raise ThreadsError('댓글 링크 또는 본문·댓글 길이를 확인하세요.')
+    client = client or ThreadsClient()
+    key = run_key or hashlib.sha256((pair['body']+pair['reply']).encode()).hexdigest()
+    root = publish_text(pair['body'], key, client, journal_path)
+    reply = publish_text(pair['reply'], key+':reply', client, journal_path, reply_to_id=root['post_id'])
+    return {**root, 'reply_id': reply['post_id'], 'reply_permalink': reply.get('permalink','')}
