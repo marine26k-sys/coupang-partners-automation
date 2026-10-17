@@ -125,3 +125,12 @@ GitHub Actions에는 이 로컬 게시 이력이 보존되지 않으므로 Threa
 참고 사이트 [todaydeal](https://github.com/HyaC1107/todaydeal)의 상품 모음 흐름을 참고하여 살림셀렉트 화면과 수집기를 새로 작성했습니다. 다른 계정의 제휴 링크나 사용 후기는 복사하지 않았습니다.
 
 공개 주소: https://marine26k-sys.github.io/sallim-select/ (GitHub Pages). Sites 기본 주소에 워크스페이스 이름과 chatgpt가 포함되어, 사용자 요청에 따라 공개 운영을 GitHub Pages로 이전했습니다. 공개 파일은 `../sallim-select-catalog` 로컬 폴더에서 `marine26k-sys/sallim-select`로 반영됩니다.
+
+
+### Cloudflare Pages 무료 호스팅 이전
+
+현재 공식 프로필 사이트는 https://sallim-select.pages.dev/ 입니다. 주소에 GitHub 사용자명이나 ChatGPT 워크스페이스 이름이 포함되지 않습니다. Cloudflare Pages Direct Upload로 공개 화면 파일 5개만 배포했습니다.
+
+가격 수집은 기존 Mac 예약 실행(09:00·18:00 KST)을 그대로 사용합니다. `catalog.py --publish`가 공개 상품 저장소의 catalog.json을 갱신하면 새 사이트도 브라우저에서 이를 읽습니다. 가격 갱신을 위해 Cloudflare에 파일을 매번 올리거나 키를 추가할 필요는 없습니다. GitHub 연결 장애 시에는 업로드 당시 저장 자료를 수집 시각과 함께 표시합니다. 화면 디자인 변경은 별도 재배포가 필요합니다.
+
+Cloudflare 프로젝트 이름: sallim-select. 인증정보나 개인 게시 이력은 배포에 포함하지 않습니다. 무료 기본 pages.dev 주소를 사용하며 유료 플랜·도메인 구매는 진행하지 않았습니다.
