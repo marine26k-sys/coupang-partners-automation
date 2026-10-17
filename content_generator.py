@@ -144,10 +144,14 @@ SHORT_DISCLOSURE = '[제휴광고] 링크 구매 시 수수료를 받습니다.'
 
 def generate_threads_pair(product_name: str, deeplink: str) -> dict:
     import json
-    model = TextModel('Threads 본문과 첫 댓글을 JSON으로 작성해. '
+    import secrets
+    from pathlib import Path
+    voice = (Path(__file__).resolve().parent / 'config/sallim_voice.txt').read_text(encoding='utf-8')
+    angle = secrets.choice(['공간 치수 하나', '구성 선택 하나', '정리 전에 분류할 물건', '구매 전 놓치기 쉬운 조건'])
+    model = TextModel(voice + '\n이번 글의 관점: ' + angle + '\nThreads 본문과 첫 댓글을 JSON으로 작성해. '
         '형식: {"hook":"본문", "reply":"댓글"}. '
         'hook은 상품 카테고리의 구매 전 고민이나 질문으로 호기심을 끄는 반말 2~3문장, 180자 이내. '
-        '상품명·링크·고지·가짜 경험담 없이 쓰고 마지막에 상품 정보는 댓글에 정리했다고 안내해. '
+        '상품명·링크·고지·가짜 경험담 없이 써. 댓글 안내는 필요할 때만 짧게, 매번 다르게 써. '
         'reply는 입력된 상품명과 명시된 구성만 담은 담백한 반말 200자 이내. '
         '후기·효능·할인·판매량·최고 등의 주장을 만들지 마. 코드블록 없이 JSON만 출력해.')
     response = model.generate_content('확인된 상품명: '+product_name, {'temperature': 0.4})
@@ -158,6 +162,9 @@ def generate_threads_pair(product_name: str, deeplink: str) -> dict:
     hook, reply = parsed['hook'].strip(), parsed['reply'].strip()
     if not hook or not reply or 'http' in hook or 'http' in reply:
         raise ValueError('Threads 본문·댓글 형식이 올바르지 않습니다.')
+    forbidden = ['여러분', '해봐라', '하시길 바랍니다', '진짜', '너무', '완전', '대박', '무조건', '필수템', '인생템', '강추', '역대급', '갓성비', '라는 점에서', '할 수 있습니다']
+    if any(word in hook or word in reply for word in forbidden) or '!' in hook + reply:
+        raise ValueError('살림셀렉트 말투 규칙 위반: 자동발행을 중단합니다.')
     pair = {'body': SHORT_DISCLOSURE+'\n\n'+hook,
             'reply': DISCLOSURE_TEXT+'\n\n'+reply+'\n\n'+deeplink}
     if any(len(value)>500 for value in pair.values()):

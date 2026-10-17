@@ -74,3 +74,20 @@ class ThreadsPairTests(unittest.TestCase):
         with self.assertRaises(ThreadsError):
             publish_pair({'body':SHORT_DISCLOSURE+'\n질문', 'reply':'고지 없는 링크'},client=client)
         client.request.assert_not_called()
+
+class BrandVoiceTests(unittest.TestCase):
+    def test_forbidden_hype_is_blocked(self):
+        from unittest.mock import patch
+        from content_generator import generate_threads_pair
+        with patch('content_generator.TextModel.generate_content',return_value=Mock(text='{"hook":"무조건 사야 해!", "reply":"정리함이야."}')):
+            with self.assertRaises(ValueError):
+                generate_threads_pair('정리함','https://link.coupang.com/a/test')
+
+    def test_voice_instructions_are_loaded_into_generation(self):
+        from unittest.mock import patch
+        from content_generator import generate_threads_pair
+        with patch('content_generator.TextModel') as model:
+            model.return_value.generate_content.return_value = Mock(text='{"hook":"수납함도 놓을 자리가 먼저지.\\n폭부터 재보면 고르기 쉽겠어.","reply":"다용도 팬트리 정리함이야."}')
+            pair = generate_threads_pair('정리함','https://link.coupang.com/a/test')
+        self.assertIn('가짜 대화',model.call_args.args[0])
+        self.assertIn('수납함도 놓을 자리가',pair['body'])
