@@ -35,3 +35,22 @@ class ToolsTest(unittest.TestCase):
                 def verify_account(self): pass
                 def request(self,*args): raise AssertionError('deleted post')
             self.assertEqual(collect(history,Client()),0)
+
+    def test_candidate_fields_and_actual_age_buckets(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            h=History(Path(folder)/'test.sqlite3')
+            h.save_candidates([{'productId': '42','productName':'<정리함>', 'productPrice':12000,
+                                'productUrl':'secret-tracking','isRocket':True}], '수납')
+            h.import_existing('x',{'productId':'42','productName':'정리함'}, {}, {'post_id':'1'})
+            identifier=h.records()[0]['id']
+            with h.db() as db:
+                db.execute('INSERT INTO insight_samples VALUES(?,?,?,?)',
+                           (identifier,100000+25*3600,100000,json.dumps({'views':123})))
+                stored=db.execute('SELECT product FROM candidates').fetchone()[0]
+                self.assertNotIn('secret-tracking',stored)
+            text=h.export_html(Path(folder)/'report.html').read_text()
+            self.assertIn('실제 25.0시간 후 조회 123',text)
+            self.assertIn('48시간 구간: 기록 없음',text)
+            self.assertIn('&lt;정리함&gt;',text)
+            self.assertIn('12,000원',text)

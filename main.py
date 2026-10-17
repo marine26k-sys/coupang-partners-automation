@@ -72,6 +72,7 @@ def run():
 
     from publication_history import History
     history = History()
+    history.save_candidates(products, keyword)
     random.shuffle(products)
     history_id, product = history.reserve(products, keyword, os.environ.get('AUTOMATION_RUN_KEY'),
                                            int(os.environ.get('PRODUCT_COOLDOWN_DAYS', '30')))

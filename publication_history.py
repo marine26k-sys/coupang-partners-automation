@@ -22,6 +22,8 @@ class History:
                 draft TEXT, publication TEXT, error_type TEXT)''')
             db.execute('CREATE INDEX IF NOT EXISTS recent_product ON runs(product_id,created)')
             db.execute('CREATE TABLE IF NOT EXISTS insights(run_id TEXT PRIMARY KEY,captured REAL,metrics TEXT)')
+            db.execute('CREATE TABLE IF NOT EXISTS insight_samples(run_id TEXT,captured REAL,published REAL,metrics TEXT,PRIMARY KEY(run_id,captured))')
+            db.execute('CREATE TABLE IF NOT EXISTS candidates(id TEXT PRIMARY KEY,keyword TEXT,captured REAL,product TEXT)')
             db.execute('CREATE TABLE IF NOT EXISTS revisions(id INTEGER PRIMARY KEY,run_id TEXT,created REAL,draft TEXT)')
 
     @contextmanager
@@ -93,6 +95,18 @@ class History:
                  '기존 게시 이력',now,now,status,json.dumps(draft,ensure_ascii=False),
                  json.dumps(publication,ensure_ascii=False),None))
 
+    def save_candidates(self, products, keyword):
+        # Store only product fields needed for comparison; never retain tracking URLs.
+        fields = ('productId','productName','productPrice','isRocket','isFreeShipping')
+        with self.db() as db:
+            for product in products:
+                if not str(product.get('productId','')).isdigit():
+                    continue
+                safe = {k: product[k] for k in fields if k in product}
+                db.execute('INSERT OR REPLACE INTO candidates VALUES(?,?,?,?)',
+                    (str(product['productId']), keyword, time.time(), json.dumps(safe,ensure_ascii=False)))
+        self.export_html()
+
     def export_html(self, target=None):
         import html
         target = Path(target) if target else Path(os.environ.get('PUBLICATION_HISTORY_REPORT', str(self.path.parent / 'publication-history.html')))
@@ -106,6 +120,8 @@ class History:
         with self.db() as db:
             metrics = {r['run_id']: dict(r) for r in db.execute('SELECT * FROM insights')}
             revisions = list(db.execute('SELECT * FROM revisions ORDER BY created DESC'))
+            samples = list(db.execute('SELECT * FROM insight_samples ORDER BY captured'))
+            candidates = list(db.execute('SELECT * FROM candidates ORDER BY captured DESC LIMIT 30'))
         for r in self.records():
             draft=r['draft'] or {}; pair=draft.get('threadsPair') or draft.get('pair') or {}
             publication=r['publication'] or {}
@@ -118,6 +134,15 @@ class History:
                 names = {'views':'조회','likes':'좋아요','replies':'댓글','reposts':'재게시','quotes':'인용','shares':'공유'}
                 performance = ' · '.join(f'{label} {values.get(key, "미제공")}' for key,label in names.items())
                 performance += ' (수집 ' + datetime.fromtimestamp(stats['captured']).strftime('%m-%d %H:%M') + ')'
+            timeline = ''
+            for hours in (24,48,72):
+                match = next((x for x in samples if x['run_id']==r['id'] and x['published'] is not None and hours <= (x['captured']-x['published'])/3600 < hours+12),None)
+                if match:
+                    age=(match['captured']-match['published'])/3600
+                    v=json.loads(match['metrics'])
+                    timeline += f'<li>{hours}시간 구간: 실제 {age:.1f}시간 후 조회 {esc(v.get("views","미제공"))} · 좋아요 {esc(v.get("likes","미제공"))}</li>'
+                else:
+                    timeline += f'<li>{hours}시간 구간: 기록 없음</li>'
             alternatives = ''
             for rev in revisions:
                 if rev['run_id'] == r['id']:
@@ -128,10 +153,18 @@ class History:
                 <h2>{esc(r['product_name'])}</h2><b>{esc(labels.get(r['status'],r['status']))}</b> {link}
                 <details><summary>본문·첫 댓글 보기</summary><h3>본문</h3><pre>{esc(pair.get('body') or draft.get('dailyPost',''))}</pre>
                 <h3>첫 댓글</h3><pre>{esc(pair.get('reply') or draft.get('hookPost',''))}</pre></details>
-                <p>{esc(performance)}</p>{alternatives}<small>이력 ID {esc(r["id"])} · 상품 ID {esc(r['product_id'])} · 오류 유형 {esc(r['error_type']) or '없음'}</small></article>''')
+                <p>{esc(performance)}</p><ul>{timeline}</ul>{alternatives}<small>이력 ID {esc(r["id"])} · 상품 ID {esc(r['product_id'])} · 오류 유형 {esc(r['error_type']) or '없음'}</small></article>''')
+        candidate_cards = ''
+        recent = {r['product_id'] for r in self.records() if r['status'] not in ('generation_failed','deleted') and r['created'] >= time.time()-30*86400}
+        for candidate in candidates:
+            product=json.loads(candidate['product'])
+            price=product.get('productPrice')
+            price_label=f'{price:,}원' if isinstance(price,(int,float)) else '가격 미제공'
+            stamp=datetime.fromtimestamp(candidate['captured']).strftime('%m-%d %H:%M')
+            candidate_cards += f'<article><h2>{esc(product.get("productName"))}</h2><p>{esc(price_label)} · 로켓배송 {"해당" if product.get("isRocket") else "미확인"} · {"최근 선택 이력 있음" if candidate["id"] in recent else "최근 선택 이력 없음"}</p><small>{esc(candidate["keyword"])} · 검색 {esc(stamp)} · 가격은 검색 당시 기준</small><p><a href="https://www.coupang.com/vp/products/{esc(candidate["id"])}" target="_blank" rel="noopener">상품 확인</a></p></article>'
         target.parent.mkdir(parents=True,exist_ok=True)
         target.write_text('''<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>살림셀렉트 게시 이력</title>
         <style>body{font:16px/1.6 -apple-system,sans-serif;background:#f7f6ef;color:#173d2d;max-width:900px;margin:40px auto;padding:0 20px}article{background:white;border:1px solid #dedfd7;border-radius:16px;padding:24px;margin:18px 0}h2{font-size:20px}small{color:#666}pre{white-space:pre-wrap;font:inherit;color:#333}a{color:#1c6650}summary{cursor:pointer;margin:18px 0}</style>
-        <h1>살림셀렉트 게시 이력</h1><p>본문·첫 댓글·발행 결과를 모아 봅니다. 파일을 다시 열거나 새로고침하면 최근 저장 내용을 확인할 수 있습니다.</p>'''+''.join(cards)+'</html>',encoding='utf-8')
+        <h1>살림셀렉트 게시 이력</h1><p>본문·첫 댓글·발행 결과를 모아 봅니다. 파일을 다시 열거나 새로고침하면 최근 저장 내용을 확인할 수 있습니다.</p>'''+ '<h2>상품 후보 비교</h2><p>쿠팡 검색 결과이며 인기 순위나 판매 성과를 의미하지 않습니다.</p>' + (candidate_cards or '<p>저장된 후보 없음</p>') + '<h2>게시 성과</h2><p>24·48·72시간 구간은 해당 시점부터 12시간 이내의 첫 실제 측정입니다. Mac이 꺼져 지나간 구간은 기록 없음으로 남습니다.</p>' + ''.join(cards)+'</html>',encoding='utf-8')
         os.chmod(target,0o600)
         return target

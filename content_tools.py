@@ -17,7 +17,17 @@ def collect(history, client):
         post_id = (record['publication'] or {}).get('post_id')
         if record['status'] == 'deleted' or not post_id:
             continue
-        result = client.request('GET', str(post_id) + '/insights', {'metric': ','.join(METRICS)})
+        try:
+            result = client.request('GET', str(post_id) + '/insights', {'metric': ','.join(METRICS)})
+        except Exception:
+            continue
+        published = None
+        try:
+            from datetime import datetime
+            metadata = client.request('GET', str(post_id), {'fields':'timestamp'})
+            published = datetime.fromisoformat(metadata['timestamp'].replace('Z','+00:00')).timestamp()
+        except Exception:
+            pass
         values = {}
         for item in result.get('data', []):
             rows = item.get('values') or []
@@ -28,6 +38,8 @@ def collect(history, client):
             with history.db() as db:
                 db.execute('INSERT OR REPLACE INTO insights VALUES(?,?,?)',
                            (record['id'], time.time(), json.dumps(values)))
+                db.execute('INSERT INTO insight_samples VALUES(?,?,?,?)',
+                           (record['id'],time.time(),published,json.dumps(values)))
             count += 1
     history.export_html()
     return count
@@ -55,14 +67,21 @@ def rewrite(history, identifier, generator=None):
 def main():
     load_dotenv(ROOT / '.env')
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['insights', 'rewrite'])
+    parser.add_argument('action', choices=['insights', 'rewrite', 'candidates'])
     parser.add_argument('--id')
+    parser.add_argument('--keyword')
     args = parser.parse_args()
     history = History()
     try:
         if args.action == 'insights':
             from threads_api import ThreadsClient
             print(f'성과 수집 완료: {collect(history, ThreadsClient())}개')
+        elif args.action == 'candidates':
+            from coupang_api import CoupangPartnersClient
+            keyword = args.keyword or history.next_keyword([k.strip() for k in os.environ.get('SEARCH_KEYWORDS','').split(',') if k.strip()])
+            products = CoupangPartnersClient().search_products(keyword, limit=10)
+            history.save_candidates(products, keyword)
+            print(f'비교 후보 {len(products)}개 저장 완료 (발행 없음)')
         else:
             if not args.id:
                 parser.error('rewrite에는 --id가 필요합니다.')
