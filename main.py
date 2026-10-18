@@ -24,8 +24,9 @@ def run():
     parser.add_argument("--no-send", action="store_true", help="공개 게시·카카오 전송 없이 초안 저장")
     args = parser.parse_args()
     threads_enabled = os.environ.get('THREADS_ENABLED', '').lower() == 'true' and not args.no_send
+    kakao_enabled = os.environ.get("KAKAO_ENABLED", "true").lower() == "true" and not args.no_send
     required = ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "GEMINI_API_KEY"]
-    if not args.no_send:
+    if kakao_enabled:
         required += ["KAKAO_REST_API_KEY", "KAKAO_REFRESH_TOKEN"]
     if threads_enabled:
         required += ['THREADS_ACCESS_TOKEN', 'THREADS_USER_ID', 'THREADS_TOKEN_EXPIRES_AT']
@@ -123,21 +124,22 @@ def run():
             try:
                 threads_result = publish_text(draft['threadsPost'], os.environ.get('AUTOMATION_RUN_KEY'))
             except ThreadsError:
-                send_draft_kakao('Threads 자동발행에 실패했습니다. 초안은 저장됐습니다. 게시 여부를 확인해주세요.',
-                                 hook_post, product_name, deeplink)
+                if kakao_enabled:
+                    send_draft_kakao('Threads 자동발행에 실패했습니다. 초안은 저장됐습니다. 게시 여부를 확인해주세요.',
+                                     hook_post, product_name, deeplink)
                 raise
             history.update(history_id, 'published', publication=threads_result)
             draft['threadsPublication'] = threads_result
             draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
         stage = 'notification'
-        if not args.no_send:
+        if kakao_enabled:
             print("4) 카카오톡 발송 중...")
             if threads_result:
                 send_draft_kakao('Threads 발행 완료\n' + threads_result.get('permalink', ''),
                                  draft['threadsPost'], product_name, deeplink)
             else:
                 send_draft_kakao(daily_post, hook_post, product_name, deeplink)
-        history.update(history_id, 'draft_ready' if args.no_send else 'notified', draft=draft)
+        history.update(history_id, 'published' if threads_result else ('notified' if kakao_enabled else 'draft_ready'), draft=draft)
         print("초안 생성 완료: artifacts/draft.json")
 
     except Exception as error:
