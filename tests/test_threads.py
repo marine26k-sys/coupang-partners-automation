@@ -106,3 +106,14 @@ class SingleBodyTests(unittest.TestCase):
         from content_generator import build_threads_post
         with self.assertRaises(ValueError):
             build_threads_post('첫 댓글을 확인해.','정리함','https://link.coupang.com/a/test')
+
+class ContainerReadinessTests(unittest.TestCase):
+    def test_waits_until_finished_before_returning(self):
+        from unittest.mock import patch
+        from threads_api import ThreadsClient
+        client=ThreadsClient(token='test',user_id='test')
+        client.request=Mock(side_effect=[{'status':'IN_PROGRESS'},{'status':'FINISHED'}])
+        with patch('threads_api.time.sleep') as sleep:
+            client.wait_ready('container')
+        self.assertEqual(client.request.call_count,2)
+        sleep.assert_called_once_with(1)

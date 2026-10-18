@@ -40,6 +40,17 @@ class ThreadsClient:
             raise ThreadsError(f'Threads API 오류 (HTTP {response.status_code}, code {code})')
         return body
 
+    def wait_ready(self, container_id):
+        for attempt in range(8):
+            status = self.request('GET', str(container_id), {'fields':'status'}).get('status')
+            if status == 'FINISHED':
+                return
+            if status != 'IN_PROGRESS':
+                raise ThreadsError('Threads 게시 준비 상태를 확인해야 합니다. 자동 재시도하지 않습니다.')
+            if attempt < 7:
+                time.sleep(1)
+        raise ThreadsError('Threads 게시 준비 시간이 초과됐습니다. 저장된 컨테이너 확인이 필요합니다.')
+
     def verify_account(self):
         account = self.request('GET', 'me', {'fields': 'id,username'})
         if str(account.get('id')) != str(self.user_id):
@@ -129,6 +140,7 @@ def publish_text(text, run_key=None, client=None, journal_path=None, reply_to_id
     with journal_connect(journal_path) as db:
         db.execute('UPDATE posts SET state=?,container_id=? WHERE account=? AND run_key=?',
                    ('publishing', container_id, str(client.user_id), run_key))
+    client.wait_ready(container_id)
     result = client.request('POST', client.user_id + '/threads_publish',
                             {'creation_id': container_id})
     post_id = result.get('id')
