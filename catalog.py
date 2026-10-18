@@ -39,6 +39,9 @@ def collect():
         except Exception as exc:
             errors.append(category+':'+type(exc).__name__)
             failed_categories.append(category)
+    from catalog_guard import check_count, price_anomaly
+    previous_count=len([p for p in previous_catalog.get('products',[]) if p.get('category') not in failed_categories])
+    check_count(len(products),previous_count)
     if not products: raise RuntimeError('상품 수집 실패: 기존 공개 자료 유지')
     links=[]
     for start in range(0,len(products),5):
@@ -54,13 +57,17 @@ def collect():
             if not link or not link.startswith('https://link.coupang.com/'): continue
             p['url']=link;p['priceChange']=None;p['previousPrice']=None;p['previousDate']=None
             price=p['price']; option=p['option']
+            p['optionKey']=option
+            p['reviewReason']=price_anomaly(price,None)
             if option and isinstance(price,(int,float)) and price>0:
                 previous=db.execute('SELECT price,day FROM prices WHERE id=? AND option=? AND day<? ORDER BY day DESC LIMIT 1',(p['id'],option,now[:10])).fetchone()
-                if previous:
+                p['reviewReason']=price_anomaly(price,previous[0] if previous else None)
+                if previous and not p['reviewReason']:
                     p['priceChange']=price-previous[0]
                     p['previousPrice']=previous[0]
                     p['previousDate']=previous[1]
-                db.execute('INSERT OR REPLACE INTO prices VALUES(?,?,?,?)',(p['id'],option,now[:10],price))
+                if not p['reviewReason']:
+                    db.execute('INSERT OR REPLACE INTO prices VALUES(?,?,?,?)',(p['id'],option,now[:10],price))
             image=p['image']
             if image.startswith('//'):p['image']='https:'+image
             if not urlparse(p['image']).hostname or not (urlparse(p['image']).hostname.endswith('.coupangcdn.com') or urlparse(p['image']).hostname=='ads-partners.coupang.com'):p['image']=''
@@ -70,6 +77,7 @@ def collect():
             p['recommendScore']=enrich(db,p,option,now[:10])
             p.pop('option');valid.append(p)
         db.commit()
+    check_count(len(valid),previous_count)
     if not valid:raise RuntimeError('본인 제휴 링크 생성 실패: 공개 자료 유지')
     for old in previous_catalog.get('products',[]):
         if old.get('category') in failed_categories:
@@ -80,7 +88,9 @@ def collect():
     from featured_products import featured_records
     from publication_history import History
     numbers=enrich_navigation(valid,previous_catalog,featured_records(History()))
-    result={'productNumbers':numbers,'updatedAt':now,'products':valid,'recommendations':recommendations(valid),'partial':bool(errors)}
+    from marketplace_compare import load_comparisons
+    comparisons=load_comparisons(folder/'comparison-offers.json')
+    result={'comparisons':comparisons,'productNumbers':numbers,'updatedAt':now,'products':valid,'recommendations':recommendations(valid),'partial':bool(errors)}
     temporary=PUBLIC/'catalog.json.tmp'
     temporary.write_text(json.dumps(result,ensure_ascii=False,indent=2))
     temporary.replace(PUBLIC/'catalog.json')

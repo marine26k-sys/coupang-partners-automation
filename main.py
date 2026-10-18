@@ -58,6 +58,14 @@ def run():
     client = CoupangPartnersClient()
     products, keyword = ranked_candidates(client, history)
     products = apply_observed_signals(products, history.path.parent/'catalog-prices.sqlite3')
+    from growth_analytics import prefer_learned
+    try:
+        learning=json.loads((history.path.parent/'analytics/learning.json').read_text())
+        products=prefer_learned(products,learning)
+    except (OSError,ValueError):
+        pass
+    from catalog_guard import price_anomaly
+    products=[p for p in products if not price_anomaly(p.get('productPrice'),None)]
     products = prefer_budget(products)
     history.save_candidates(products, keyword)
     history_id, product = history.reserve(products, keyword, os.environ.get('AUTOMATION_RUN_KEY'),

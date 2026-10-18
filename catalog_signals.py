@@ -28,7 +28,7 @@ def enrich(db,p,option,day):
 
 
 def recommendations(products):
-    fresh=[p for p in products if not p.get('stale')]
+    fresh=[p for p in products if not p.get('stale') and not p.get('reviewReason')]
     ordered=sorted(fresh,key=lambda p:p.get('recommendScore',0),reverse=True)
     seen=set();picks=[]
     for p in ordered:

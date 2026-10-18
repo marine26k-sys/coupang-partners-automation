@@ -47,6 +47,9 @@ def apply_observed_signals(products, database):
                 if not option:continue
                 previous=db.execute('SELECT day,price FROM prices WHERE id=? AND option=? AND day<? ORDER BY day DESC LIMIT 1',(str(p['productId']),option,today)).fetchone()
                 price=p.get('productPrice')
+                from catalog_guard import price_anomaly
+                p['reviewReason']=price_anomaly(price,previous[1] if previous else None)
+                if p['reviewReason']:continue
                 if previous and isinstance(price,(int,float)) and previous[1]>price>0:
                     drop=previous[1]-price
                     p['observedScore']=min(40,drop/previous[1]*200)
@@ -60,7 +63,7 @@ def apply_observed_signals(products, database):
     except sqlite3.Error:
         return products
     sources=list(dict.fromkeys(p['selectionSource'] for p in products))
-    return sorted(products,key=lambda p:(sources.index(p['selectionSource']),-p.get('observedScore',0),p['selectionRank']))
+    return sorted([p for p in products if not p.get('reviewReason')],key=lambda p:(sources.index(p['selectionSource']),-p.get('observedScore',0),p['selectionRank']))
 
 
 def prefer_budget(products, hour=None):
