@@ -113,7 +113,7 @@ def published_for_run(user_id, run_key, journal_path=None):
 def publish_text(text, run_key=None, client=None, journal_path=None, reply_to_id=None):
     from content_generator import DISCLOSURE_TEXT, SHORT_DISCLOSURE
     is_hook = text.startswith(SHORT_DISCLOSURE)
-    if not is_hook and (not text.startswith(DISCLOSURE_TEXT) or 'https://link.coupang.com/' not in text):
+    if not is_hook and (not any(line in (DISCLOSURE_TEXT, '※ '+DISCLOSURE_TEXT) for line in text.splitlines()) or 'https://link.coupang.com/' not in text):
         raise ThreadsError('제휴 고지와 제휴 링크가 있는 글만 게시합니다.')
     if len(text) > 500:
         raise ThreadsError('Threads 글이 500자를 초과했습니다. 초안만 저장합니다.')
