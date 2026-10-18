@@ -56,7 +56,7 @@ def run():
 
     print("2) 딥링크 일괄 생성 중...")
     plain_urls = [build_plain_url(p) for p in products]
-    links = client.create_deeplinks(plain_urls, sub_id="dashboard_auto")
+    links = client.create_deeplinks(plain_urls, sub_id="sallimblog")
     deeplink_map = {link["originalUrl"]: link["shortenUrl"] for link in links}
 
     items = []

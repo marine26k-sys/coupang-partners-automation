@@ -4,7 +4,7 @@
 - `growth_analytics.py`: 쿠팡 4종 리포트 최근 7일(어제까지) 수집, `artifacts/analytics` 권한600 비공개 저장. 과거 식별자 없는 유입은 미분류, 누락 지표는 미확인. 리포트 수수료는 확정 입금액으로 부르지 않는다.
 - `content_tools.py insights`: Threads 읽기 전용 지표 수집. 학습은 발행24시간 이후·그룹5글·조회100 이상, 두 주제 이상 표본 확보 후 최대10점 가중치만 사용. 강한 가격 근거·예산 우선순위를 대체하지 않는다. 시간대는 자동 변경하지 않는다.
 - `browser-metrics.json`: 토스·네이버에서 실제 보이는 지표만 provider/date/scope/capturedAt과 저장한다. 계정 전체 통계를 채널별로 임의 분해하지 않는다. 토스 계정 합계와 쿠팡 합계, 기간이 다른 지표는 더하지 않는다. 초기 등록 화면의 placeholder 0을 수집하지 않는다.
-- 쿠팡 채널은 유효한 등록 subId를 사용한다. threads_auto=Threads, sallim_select=홈페이지, blog_auto=블로그. 계정에서 등록을 확인하기 전 새로운 식별자를 임의 생성하지 않는다.
+- 쿠팡 채널은 유효한 등록 subId를 사용한다. sallimthreads=Threads, sallimcatalog=홈페이지, sallimblog=블로그. 계정에서 등록을 확인하기 전 새로운 식별자를 임의 생성하지 않는다.
 
 ## 비교
 - `artifacts/comparison-offers.json`: service/name/brand/model/variant/quantity/unit/price/shipping/url/checkedAt/verified/ownerLinkVerified.

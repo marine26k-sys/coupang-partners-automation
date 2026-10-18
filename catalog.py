@@ -45,7 +45,7 @@ def collect():
     if not products: raise RuntimeError('상품 수집 실패: 기존 공개 자료 유지')
     links=[]
     for start in range(0,len(products),5):
-        links.extend(client.create_deeplinks([p['plain'] for p in products[start:start+5]],sub_id='sallim_select'))
+        links.extend(client.create_deeplinks([p['plain'] for p in products[start:start+5]],sub_id='sallimcatalog'))
     by_url={x.get('originalUrl'):x.get('shortenUrl') for x in links}
     valid=[]
     folder=ROOT/'artifacts';folder.mkdir(exist_ok=True)

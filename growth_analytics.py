@@ -10,7 +10,7 @@ import time
 from urllib.parse import urlencode
 from publication_history import History, ROOT
 
-CHANNELS={'threads_auto':'Threads','sallim_select':'홈페이지','blog_auto':'블로그'}
+CHANNELS={'sallimthreads':'Threads','sallimcatalog':'홈페이지','sallimblog':'블로그','threads_auto':'Threads(이전 식별자)','sallim_select':'홈페이지(이전 식별자)'}
 KINDS=('clicks','orders','cancels','commission')
 
 

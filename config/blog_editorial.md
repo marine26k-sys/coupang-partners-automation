@@ -46,3 +46,5 @@
 3. `.venv/bin/python blog_queue.py claim --id <ID>`로 발행 시작한다. 반환된 보호 파일의 html/text만 네이버 편집기에 넣고 정확한 공식 사진을 맨 아래 업로드한다.
 4. 브라우저에서 제목·문장·링크·광고 고지·사진 위치를 검토하고 발행한다. 공개 글을 확인한 뒤 `blog_queue.py finish --id <ID> --url https://blog.naver.com/sallim-select/<글번호>`로 기록한다.
 5. publishing 상태로 남은 항목은 결과 불확실 상태다. 같은 상품이나 시간대를 재발행하지 말고 공개 글부터 확인한다. 기존 publication-tests.json도 반드시 대조한다.
+
+쿠팡 블로그 제휴 링크 발급 시 등록된 채널 ID `sallimblog`를 사용한다. 기존 링크를 단순 변형하지 말고 딥링크 API로 새로 발급한다.

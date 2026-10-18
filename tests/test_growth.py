@@ -12,7 +12,7 @@ class GrowthTests(unittest.TestCase):
         self.assertIsNotNone(price_anomaly(1000,10000))
         self.assertIsNone(price_anomaly(9000,10000))
     def test_reports_do_not_double_count_clicks(self):
-        snapshot={'start':'20261001','end':'20261007','reports':{'clicks':{'available':True,'rows':[{'subId':'threads_auto','click':5}]},'orders':{'available':False,'rows':[]},'cancels':{'available':True,'rows':[]},'commission':{'available':True,'rows':[{'subId':'threads_auto','click':5,'commission':100}]}}}
+        snapshot={'start':'20261001','end':'20261007','reports':{'clicks':{'available':True,'rows':[{'subId':'sallimthreads','click':5}]},'orders':{'available':False,'rows':[]},'cancels':{'available':True,'rows':[]},'commission':{'available':True,'rows':[{'subId':'sallimthreads','click':5,'commission':100}]}}}
         report=aggregate(snapshot);self.assertEqual(report['channels']['Threads']['clicks'],5);self.assertFalse(report['availability']['orders']);self.assertNotIn('orders',report['channels']['Threads'])
     def test_failed_report_is_unavailable_not_zero(self):
         class Client:
@@ -33,3 +33,16 @@ class GrowthTests(unittest.TestCase):
     def test_learning_small_samples_preserves_order(self):
         products=[{'selectionSource':'주방용품 베스트'},{'selectionSource':'생활용품 베스트'}]
         self.assertEqual(prefer_learned(products,{'groups':{'topic':{'주방용품 베스트':{'eligible':False}}}}),products)
+
+    def test_rate_limit_stops_remaining_report_calls(self):
+        import requests
+        class Client:
+            calls=0
+            def _request(self,*a,**kw):
+                self.calls+=1
+                response=requests.Response();response.status_code=429
+                raise requests.HTTPError(response=response)
+        client=Client();result=fetch_reports(client,'20261001','20261007',pause=lambda x:None)
+        self.assertEqual(client.calls,1)
+        self.assertEqual(len(result['reports']),4)
+        self.assertTrue(all(not r['available'] for r in result['reports'].values()))

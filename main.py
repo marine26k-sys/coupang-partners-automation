@@ -96,7 +96,7 @@ def run():
         print(f"   -> 선택된 상품: {product_name}")
 
         print("2) 딥링크 생성 중...")
-        links = client.create_deeplinks([plain_url], sub_id="threads_auto")
+        links = client.create_deeplinks([plain_url], sub_id="sallimthreads")
         if not links or not links[0].get("shortenUrl"):
             raise RuntimeError("제휴 링크 생성 실패: 일반 상품 링크로 대체하지 않습니다.")
         deeplink = links[0]["shortenUrl"]
