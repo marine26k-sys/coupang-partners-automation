@@ -26,3 +26,11 @@ class OperatorTests(unittest.TestCase):
         with TemporaryDirectory() as temp:
             data=snapshot(Path(temp));data['threads']=[dict(status='draft_ready',updated=0,publication={},draft={'threadsPost':'<script>bad</script>'},product_name='<img src=x onerror=alert(1)>')]
             view=render(data);self.assertNotIn('<script>bad</script>',view);self.assertIn('&lt;script&gt;',view)
+
+    def test_manual_posts_do_not_count_as_scheduled(self):
+        with TemporaryDirectory() as temp:
+            now=datetime(2026,10,18,16,tzinfo=ZoneInfo('Asia/Seoul'))
+            data=snapshot(Path(temp),now);data['threadsHours']=[9,13,18]
+            data['threads']=[dict(run_key=key,status='published',updated=now.timestamp(),publication={},draft={},product_name='상품') for key in ['2026-10-18-09','2026-10-18-13',None]]
+            view=render(data)
+            self.assertIn('2 / 3',view);self.assertIn('수동·시험 1건 별도',view)

@@ -98,14 +98,17 @@ def snapshot(root=ROOT, now=None):
     analytics=read_json(folder/'analytics/summary.json',{})
     for key,ok in analytics.get('availability',{}).items():
         if not ok:issues.append('성과 리포트 연결 확인 필요 · '+key)
-    return {'now':now,'threads':threads,'queue':queue,'analytics':analytics,'browserMetrics':read_json(folder/'analytics/browser-metrics.json',[]),'legacyBlogs':read_json(folder/'blog-drafts/publication-tests.json',{}).get('posts',[]),'learning':read_json(folder/'analytics/learning.json',{}),'issues':list(dict.fromkeys(issues))[:15],'catalog':catalog,'threadsEnabled':enabled,'threadsNext':next_slot(now,hours) if enabled and hours else '비활성 또는 예약 확인 필요','blogEnabled':blog_config.get('status')=='ACTIVE','blogNext':next_slot(now,[10,19]) if blog_config.get('status')=='ACTIVE' else '비활성 또는 예약 확인 필요'}
+    return {'now':now,'threads':threads,'queue':queue,'analytics':analytics,'browserMetrics':read_json(folder/'analytics/browser-metrics.json',[]),'legacyBlogs':read_json(folder/'blog-drafts/publication-tests.json',{}).get('posts',[]),'learning':read_json(folder/'analytics/learning.json',{}),'issues':list(dict.fromkeys(issues))[:15],'catalog':catalog,'threadsHours':hours,'threadsEnabled':enabled,'threadsNext':next_slot(now,hours) if enabled and hours else '비활성 또는 예약 확인 필요','blogEnabled':blog_config.get('status')=='ACTIVE','blogNext':next_slot(now,[10,19]) if blog_config.get('status')=='ACTIVE' else '비활성 또는 예약 확인 필요'}
 
 
 def render(data):
     now=data['now'];today=now.strftime('%Y-%m-%d')
-    completed=sum(r['status'] in SUCCESS and datetime.fromtimestamp(r['updated'],KST).date()==now.date() for r in data['threads'])
+    successful=[r for r in data['threads'] if r['status'] in SUCCESS and datetime.fromtimestamp(r['updated'],KST).date()==now.date()]
+    scheduled={r.get('run_key') for r in successful if r.get('run_key') in {today+f'-{h:02d}' for h in data.get('threadsHours',[])}}
+    manual=sum(not r.get('run_key') for r in successful)
+    completed=f"{len(scheduled)} / {len(data.get('threadsHours',[]))}"
     blog_done=sum(r['state']=='published' and str(r['slot']).startswith(today) for r in data['queue'])
-    cards=''.join('<div class="stat"><small>'+title+'</small><strong>'+esc(value)+'</strong><span>'+note+'</span></div>' for title,value,note in [('오늘 Threads 처리 완료',completed,'최근 30건의 기록 기준'),('오늘 블로그 발행',blog_done,'새 대기열 기록 기준'),('다음 Threads',data['threadsNext'],'09시 · 13시 · 18시 / 한국시간'),('다음 블로그',data['blogNext'],'10시 쿠팡 · 19시 토스 / 한국시간')])
+    cards=''.join('<div class="stat"><small>'+title+'</small><strong>'+esc(value)+'</strong><span>'+note+'</span></div>' for title,value,note in [('오늘 Threads 예약 발행',completed,f'예약 완료 / 하루 예약 · 수동·시험 {manual}건 별도'),('오늘 블로그 발행',blog_done,'새 대기열 기록 기준'),('다음 Threads',data['threadsNext'],'09시 · 13시 · 18시 / 한국시간'),('다음 블로그',data['blogNext'],'10시 쿠팡 · 19시 토스 / 한국시간')])
     thread_rows=''
     for r in data['threads']:
         publication=r['publication'];draft=r['draft']
