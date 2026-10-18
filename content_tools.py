@@ -46,7 +46,7 @@ def collect(history, client):
 
 
 def rewrite(history, identifier, generator=None):
-    from content_generator import generate_threads_pair
+    from content_generator import generate_threads_post
     record = next((r for r in history.records() if r['id'] == identifier), None)
     if not record or not record['draft']:
         raise ValueError('저장된 초안 ID를 확인하세요.')
@@ -54,9 +54,9 @@ def rewrite(history, identifier, generator=None):
     link = draft.get('deeplink')
     if not link or not link.startswith('https://link.coupang.com/'):
         raise ValueError('원본 제휴 링크가 필요합니다.')
-    pair = (generator or generate_threads_pair)(record['product_name'], link)
+    pair = (generator or generate_threads_post)(record['product_name'], link)
     result = {'source_id': identifier, 'productName': record['product_name'],
-              'deeplink': link, 'threadsPair': pair, 'status': 'unpublished'}
+              'deeplink': link, **({'threadsPair':pair} if isinstance(pair,dict) else {'threadsPost':pair,'publicationFormat':'single'}), 'status': 'unpublished'}
     with history.db() as db:
         db.execute('INSERT INTO revisions(run_id,created,draft) VALUES(?,?,?)',
                    (identifier, time.time(), json.dumps(result, ensure_ascii=False)))

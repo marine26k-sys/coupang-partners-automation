@@ -91,3 +91,18 @@ class BrandVoiceTests(unittest.TestCase):
             pair = generate_threads_pair('정리함','https://link.coupang.com/a/test')
         self.assertIn('가짜 대화',model.call_args.args[0])
         self.assertIn('수납함도 놓을 자리가',pair['body'])
+
+class SingleBodyTests(unittest.TestCase):
+    def test_body_has_product_link_and_disclosure_without_comment(self):
+        from content_generator import build_threads_post, SHORT_DISCLOSURE
+        text=build_threads_post('앞으로 당길 공간도 재보고 골라.','슬라이딩 정리함','https://link.coupang.com/a/test')
+        self.assertTrue(text.startswith(SHORT_DISCLOSURE))
+        self.assertTrue(text.endswith(DISCLOSURE_TEXT))
+        self.assertIn('슬라이딩 정리함',text)
+        self.assertIn('https://link.coupang.com/a/test',text)
+        self.assertNotIn('댓글',text)
+
+    def test_comment_directions_are_rejected(self):
+        from content_generator import build_threads_post
+        with self.assertRaises(ValueError):
+            build_threads_post('첫 댓글을 확인해.','정리함','https://link.coupang.com/a/test')

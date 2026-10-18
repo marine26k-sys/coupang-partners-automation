@@ -56,11 +56,8 @@ def run():
         from threads_api import published_for_run
         prior_root = published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'])
         if prior_root:
-            prior_reply = published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'] + ':reply')
-            if prior_reply:
-                print('이 예약 시간의 Threads 게시가 이미 완료돼 중복 실행을 건너뜁니다.')
-                return
-            raise RuntimeError('이 예약의 본문만 게시돼 있습니다. 저장된 초안으로 댓글 복구가 필요합니다.')
+            print('이 예약 시간의 Threads 게시가 이미 완료돼 중복 실행을 건너뜁니다.')
+            return
     print("1) 상품 검색 중...")
     keyword = pick_keyword()
     client = CoupangPartnersClient()
@@ -122,18 +119,18 @@ def run():
         }
         draft_path = Path('artifacts/draft.json')
         if threads_enabled:
-            draft['threadsPair'] = generate_threads_pair(product_name, deeplink)
-            draft['threadsPost'] = draft['threadsPair']['body'] + '\n\n[첫 댓글]\n' + draft['threadsPair']['reply']
+            draft['threadsPost'] = generate_threads_post(product_name, deeplink)
+            draft['publicationFormat'] = 'single'
         draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
         history.update(history_id, 'draft_ready', draft=draft)
         threads_result = None
         if threads_enabled:
-            from threads_api import publish_pair, ThreadsError
+            from threads_api import publish_text, ThreadsError
             print('4) Threads 게시 중...')
             stage = 'publication'
             history.update(history_id, 'publishing')
             try:
-                threads_result = publish_pair(draft['threadsPair'], os.environ.get('AUTOMATION_RUN_KEY'))
+                threads_result = publish_text(draft['threadsPost'], os.environ.get('AUTOMATION_RUN_KEY'))
             except ThreadsError:
                 send_draft_kakao('Threads 자동발행에 실패했습니다. 초안은 저장됐습니다. 게시 여부를 확인해주세요.',
                                  hook_post, product_name, deeplink)

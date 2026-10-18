@@ -146,13 +146,14 @@ class History:
             alternatives = ''
             for rev in revisions:
                 if rev['run_id'] == r['id']:
-                    pair_rev = json.loads(rev['draft'])['threadsPair']
+                    revision = json.loads(rev['draft'])
+                    pair_rev = revision.get('threadsPair') or {'body':revision.get('threadsPost',''),'reply':'첫 댓글 없음 · 본문에 포함'}
                     alternatives += '<details><summary>미발행 재작성 초안</summary><pre>' + esc(pair_rev['body']) + '</pre><pre>' + esc(pair_rev['reply']) + '</pre></details>'
             stamp=datetime.fromtimestamp(r['created'],timezone.utc).astimezone().strftime('%Y-%m-%d %H:%M')
             cards.append(f'''<article><small>{esc(stamp)} · {esc(r['keyword'])}</small>
                 <h2>{esc(r['product_name'])}</h2><b>{esc(labels.get(r['status'],r['status']))}</b> {link}
-                <details><summary>본문·첫 댓글 보기</summary><h3>본문</h3><pre>{esc(pair.get('body') or draft.get('dailyPost',''))}</pre>
-                <h3>첫 댓글</h3><pre>{esc(pair.get('reply') or draft.get('hookPost',''))}</pre></details>
+                <details><summary>본문·첫 댓글 보기</summary><h3>본문</h3><pre>{esc(pair.get('body') or draft.get('threadsPost') or draft.get('dailyPost',''))}</pre>
+                <h3>첫 댓글</h3><pre>{esc(pair.get('reply') or ('첫 댓글 없음 · 본문에 포함' if draft.get('threadsPost') else draft.get('hookPost','')))}</pre></details>
                 <p>{esc(performance)}</p><ul>{timeline}</ul>{alternatives}<small>이력 ID {esc(r["id"])} · 상품 ID {esc(r['product_id'])} · 오류 유형 {esc(r['error_type']) or '없음'}</small></article>''')
         candidate_cards = ''
         recent = {r['product_id'] for r in self.records() if r['status'] not in ('generation_failed','deleted') and r['created'] >= time.time()-30*86400}

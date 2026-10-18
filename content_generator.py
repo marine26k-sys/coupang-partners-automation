@@ -128,14 +128,25 @@ def build_comment(deeplink: str) -> str:
 
 
 def generate_threads_post(product_name: str, deeplink: str) -> str:
-    model = TextModel('상품명을 바탕으로 Threads 상품 소개 본문만 250자 이내로 작성해. '
-                      '입력에 명시된 사실만 쓰고 가격, 후기, 효능, 사용담을 만들지 마. '
-                      '링크, 제목, 댓글 표시 없이 담백한 반말 2~4문장으로 써.')
-    response = model.generate_content(f'확인된 상품명: {product_name}',
-                                      {'temperature': 0.4})
-    text = f'{DISCLOSURE_TEXT}\n\n{response.text.strip()}\n\n{deeplink}'
-    if len(text) > 500:
-        raise ValueError('Threads 게시글이 500자를 초과했습니다. 자동으로 잘라 게시하지 않습니다.')
+    from pathlib import Path
+    voice = (Path(__file__).resolve().parent / 'config/sallim_voice.txt').read_text(encoding='utf-8')
+    model = TextModel(voice + '\n이번 요청은 댓글 없이 본문 한 개로 완결해. '
+        '생활 속 불편 하나와 구매 전 확인 기준을 연결한 담백한 반말 2~4문장, 220자 이내. '
+        '상품명은 프로그램이 별도 추가하므로 반복하지 마. 댓글 안내·링크 안내·가짜 경험·후기·효능·가격·할인 추정은 금지. '
+        '링크와 고지를 제외한 글만 작성해.')
+    response = model.generate_content('확인된 상품명: '+product_name, {'temperature':0.4})
+    return build_threads_post(response.text.strip(), product_name, deeplink)
+
+
+def build_threads_post(copy: str, product_name: str, deeplink: str) -> str:
+    forbidden = ['여러분','해봐라','하시길 바랍니다','진짜','너무','완전','대박','무조건','필수템','인생템','강추','역대급','갓성비','라는 점에서','할 수 있습니다','댓글']
+    if not copy or 'http' in copy or any(x in copy for x in forbidden) or '!' in copy:
+        raise ValueError('본문 문구 또는 말투 규칙을 확인하세요.')
+    if not deeplink.startswith('https://link.coupang.com/'):
+        raise ValueError('본인 제휴 링크가 필요합니다.')
+    text = SHORT_DISCLOSURE+'\n\n'+copy+'\n\n'+product_name+'\n'+deeplink+'\n\n'+DISCLOSURE_TEXT
+    if len(text)>500:
+        raise ValueError('Threads 본문이 500자를 초과했습니다.')
     return text
 
 
