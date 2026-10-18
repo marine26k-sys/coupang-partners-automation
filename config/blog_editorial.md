@@ -38,3 +38,11 @@
 - 동일 문장 반복과 직전 글의 상투적인 끝맺음을 확인하고 수정한다. 광고 고지는 반복 검사에서 제외한다.
 - 본인 제휴 링크, 서비스별 광고 고지, 이미지, 상품 옵션과 가격 확인 시각을 최종 확인한다. 가격은 6시간 이내 자료만 사용하고 오래됐으면 재조회하거나 가격을 생략한다.
 - 치수를 재라는 일반 조언과 실제 제품 치수 주장을 구분한다. 문자열 일치만으로 사실이 검증됐다고 판단하지 않는다.
+
+
+## 필수 발행 대기열
+1. `blog_queue.py`의 prepare 입력 형식으로 비공개 JSON을 만든다. provider, product(name/id/affiliateUrl/option/image/imageVerifiedByOwner/checkedAt), title, sections(heading/body 3개). 토스는 linkVerifiedByOwner=true가 필수다. verifiedEvidence에는 실제 확인한 사양만 넣는다. 이미지와 링크 확인 플래그는 실제 확인 후 설정한다.
+2. `.venv/bin/python blog_queue.py enqueue --input <보호된 JSON> --slot YYYY-MM-DD-10` (토스는 -19). 검수 실패 시 공개 발행하지 않는다. 입력 파일은 권한 600으로 저장한다.
+3. `.venv/bin/python blog_queue.py claim --id <ID>`로 발행 시작한다. 반환된 보호 파일의 html/text만 네이버 편집기에 넣고 정확한 공식 사진을 맨 아래 업로드한다.
+4. 브라우저에서 제목·문장·링크·광고 고지·사진 위치를 검토하고 발행한다. 공개 글을 확인한 뒤 `blog_queue.py finish --id <ID> --url https://blog.naver.com/sallim-select/<글번호>`로 기록한다.
+5. publishing 상태로 남은 항목은 결과 불확실 상태다. 같은 상품이나 시간대를 재발행하지 말고 공개 글부터 확인한다. 기존 publication-tests.json도 반드시 대조한다.
