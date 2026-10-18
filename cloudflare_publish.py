@@ -13,7 +13,7 @@ def prepare(target=None):
     target.mkdir(parents=True,exist_ok=True)
     for name in ASSETS:
         shutil.copy2(PUBLIC/name,target/name)
-    (target/'_headers').write_text('/catalog.json\n  Cache-Control: no-store\n/app.js\n  Cache-Control: no-cache\n')
+    (target/'_headers').write_text('/catalog.json\n  Cache-Control: no-store\n/app.js\n  Cache-Control: no-cache\n/style.css\n  Cache-Control: no-cache\n/\n  Cache-Control: no-cache\n')
     return target
 
 def deploy():
