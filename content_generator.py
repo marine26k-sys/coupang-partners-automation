@@ -127,7 +127,7 @@ def build_comment(deeplink: str) -> str:
     return f"{DISCLOSURE_TEXT}\n{deeplink}"
 
 
-def generate_threads_post(product_name: str, deeplink: str) -> str:
+def generate_threads_post(product_name: str, deeplink: str, observed_fact: str = '') -> str:
     from pathlib import Path
     voice = (Path(__file__).resolve().parent / 'config/sallim_voice.txt').read_text(encoding='utf-8')
     model = TextModel(voice + '\n이번 요청은 댓글 없이 본문 한 개로 완결해. '
@@ -135,16 +135,16 @@ def generate_threads_post(product_name: str, deeplink: str) -> str:
         '상품명은 프로그램이 별도 추가하므로 반복하지 마. 댓글 안내·링크 안내·가짜 경험·후기·효능·가격·할인 추정은 금지. '
         '링크와 고지를 제외한 글만 작성해.')
     response = model.generate_content('확인된 상품명: '+product_name, {'temperature':0.4})
-    return build_threads_post(response.text.strip(), product_name, deeplink)
+    return build_threads_post(response.text.strip(), product_name, deeplink, observed_fact)
 
 
-def build_threads_post(copy: str, product_name: str, deeplink: str) -> str:
+def build_threads_post(copy: str, product_name: str, deeplink: str, observed_fact: str = '') -> str:
     forbidden = ['여러분','해봐라','하시길 바랍니다','진짜','너무','완전','대박','무조건','필수템','인생템','강추','역대급','갓성비','라는 점에서','할 수 있습니다','댓글']
     if not copy or 'http' in copy or any(x in copy for x in forbidden) or '!' in copy:
         raise ValueError('본문 문구 또는 말투 규칙을 확인하세요.')
     if not deeplink.startswith('https://link.coupang.com/'):
         raise ValueError('본인 제휴 링크가 필요합니다.')
-    text = copy+'\n\n'+product_name+'\n'+deeplink+'\n\n※ '+DISCLOSURE_TEXT
+    text = copy+'\n\n'+product_name+(('\n'+observed_fact) if observed_fact else '')+'\n'+deeplink+'\n\n※ '+DISCLOSURE_TEXT
     if len(text)>500:
         raise ValueError('Threads 본문이 500자를 초과했습니다.')
     return text

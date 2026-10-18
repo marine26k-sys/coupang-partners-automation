@@ -52,10 +52,11 @@ def run():
             return
     print("1) 쿠팡 골드박스·카테고리 베스트 조회 중...")
     from publication_history import History
-    from product_selection import ranked_candidates
+    from product_selection import ranked_candidates, apply_observed_signals
     history = History()
     client = CoupangPartnersClient()
     products, keyword = ranked_candidates(client, history)
+    products = apply_observed_signals(products, history.path.parent/'catalog-prices.sqlite3')
     history.save_candidates(products, keyword)
     history_id, product = history.reserve(products, keyword, os.environ.get('AUTOMATION_RUN_KEY'),
                                            int(os.environ.get('PRODUCT_COOLDOWN_DAYS', '30')))
@@ -105,11 +106,11 @@ def run():
             "dailyPost": daily_post, "hookPost": hook_post,
             "productImage": product.get("productImage", ""), "productPrice": product.get("productPrice"),
             "priceCapturedAt": __import__("datetime").datetime.now(__import__("zoneinfo").ZoneInfo("Asia/Seoul")).isoformat(timespec="seconds"),
-            "selectionSource": product["selectionSource"], "selectionRank": product["selectionRank"],
+            "selectionSource": product["selectionSource"], "selectionRank": product["selectionRank"], "observedFact": product.get("observedFact", ""),
         }
         draft_path = Path('artifacts/draft.json')
         if threads_enabled:
-            draft['threadsPost'] = generate_threads_post(product_name, deeplink)
+            draft['threadsPost'] = generate_threads_post(product_name, deeplink, product.get('observedFact',''))
             draft['publicationFormat'] = 'single'
         draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
         history.update(history_id, 'draft_ready', draft=draft)
