@@ -34,3 +34,10 @@ class OperatorTests(unittest.TestCase):
             data['threads']=[dict(run_key=key,status='published',updated=now.timestamp(),publication={},draft={},product_name='상품') for key in ['2026-10-18-09','2026-10-18-13',None]]
             view=render(data)
             self.assertIn('2 / 3',view);self.assertIn('수동·시험 1건 별도',view)
+
+    def test_manual_blog_records_separate_from_today(self):
+        with TemporaryDirectory() as temp:
+            data=snapshot(Path(temp));data['legacyBlogs']=[{'url':'https://blog.naver.com/sallim-select/1','status':'published_verified','title':'수동 글'},{'url':'https://blog.naver.com/sallim-select/1','status':'published_verified','title':'중복 기록'}]
+            view=render(data)
+            self.assertIn('수동 1건 누적',view)
+            self.assertIn('오늘 블로그 예약 발행',view)
