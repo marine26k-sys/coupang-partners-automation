@@ -103,6 +103,8 @@ def run():
         draft = {
             "demo": False, "productId": str(product_id), "productName": product_name, "deeplink": deeplink, "keyword": keyword,
             "dailyPost": daily_post, "hookPost": hook_post,
+            "productImage": product.get("productImage", ""), "productPrice": product.get("productPrice"),
+            "priceCapturedAt": __import__("datetime").datetime.now(__import__("zoneinfo").ZoneInfo("Asia/Seoul")).isoformat(timespec="seconds"),
             "selectionSource": product["selectionSource"], "selectionRank": product["selectionRank"],
         }
         draft_path = Path('artifacts/draft.json')

@@ -61,7 +61,10 @@ def collect():
         db.commit()
     if not valid:raise RuntimeError('본인 제휴 링크 생성 실패: 공개 자료 유지')
     PUBLIC.mkdir(exist_ok=True)
-    result={'updatedAt':now,'products':valid,'partial':bool(errors)}
+    from featured_products import featured_records
+    from publication_history import History
+    featured=featured_records(History())
+    result={'updatedAt':now,'products':valid,'featured':featured,'partial':bool(errors)}
     temporary=PUBLIC/'catalog.json.tmp'
     temporary.write_text(json.dumps(result,ensure_ascii=False,indent=2))
     temporary.replace(PUBLIC/'catalog.json')
