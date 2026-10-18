@@ -6,23 +6,15 @@ import argparse
 import json
 from pathlib import Path
 import os
-import random
 from urllib.parse import urlparse, parse_qs
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from coupang_api import CoupangPartnersClient
-from content_generator import generate_daily_post, generate_hook_and_recommend, generate_threads_post, generate_threads_pair
+from content_generator import generate_daily_post, generate_hook_and_recommend, generate_threads_post
 from mailer import send_draft_kakao
 
-
-def pick_keyword() -> str:
-    keywords = [k.strip() for k in os.environ.get("SEARCH_KEYWORDS", "").split(",") if k.strip()]
-    if not keywords:
-        raise ValueError(".env의 SEARCH_KEYWORDS를 최소 1개 이상 설정해주세요.")
-    from publication_history import History
-    return History().next_keyword(keywords)
 
 
 def run():
@@ -32,7 +24,7 @@ def run():
     parser.add_argument("--no-send", action="store_true", help="공개 게시·카카오 전송 없이 초안 저장")
     args = parser.parse_args()
     threads_enabled = os.environ.get('THREADS_ENABLED', '').lower() == 'true' and not args.no_send
-    required = ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "GEMINI_API_KEY", "SEARCH_KEYWORDS"]
+    required = ["COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "GEMINI_API_KEY"]
     if not args.no_send:
         required += ["KAKAO_REST_API_KEY", "KAKAO_REFRESH_TOKEN"]
     if threads_enabled:
@@ -58,24 +50,19 @@ def run():
         if prior_root:
             print('이 예약 시간의 Threads 게시가 이미 완료돼 중복 실행을 건너뜁니다.')
             return
-    print("1) 상품 검색 중...")
-    keyword = pick_keyword()
-    client = CoupangPartnersClient()
-    products = client.search_products(keyword, limit=10)
-
-    if not products:
-        print(f"'{keyword}' 검색 결과가 없습니다.")
-        return
-
+    print("1) 쿠팡 골드박스·카테고리 베스트 조회 중...")
     from publication_history import History
+    from product_selection import ranked_candidates
     history = History()
+    client = CoupangPartnersClient()
+    products, keyword = ranked_candidates(client, history)
     history.save_candidates(products, keyword)
-    random.shuffle(products)
     history_id, product = history.reserve(products, keyword, os.environ.get('AUTOMATION_RUN_KEY'),
                                            int(os.environ.get('PRODUCT_COOLDOWN_DAYS', '30')))
     if product is None:
         print('검색된 상품이 모두 최근 게시·선택 이력에 있어 이번 실행은 건너뜁니다.')
         return
+    keyword = product['selectionSource']
     stage = 'generation'
     try:
         product_name = product.get("productName", "")
@@ -107,7 +94,7 @@ def run():
         daily_post = generate_daily_post(keyword, deeplink)
         hook_post = generate_hook_and_recommend(
             product_name=product_name,
-            product_features="(상품 검색 결과 기반)",
+            product_features='(쿠팡 '+keyword+' 목록에서 확인된 상품명·구성 기준)',
             price=price,
             deeplink=deeplink,
         )
@@ -116,6 +103,7 @@ def run():
         draft = {
             "demo": False, "productId": str(product_id), "productName": product_name, "deeplink": deeplink, "keyword": keyword,
             "dailyPost": daily_post, "hookPost": hook_post,
+            "selectionSource": product["selectionSource"], "selectionRank": product["selectionRank"],
         }
         draft_path = Path('artifacts/draft.json')
         if threads_enabled:

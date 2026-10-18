@@ -62,7 +62,7 @@ class History:
                     continue
                 identifier = uuid.uuid4().hex
                 db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?,?,?,?)',
-                    (identifier,run_key,pid,product['productName'],keyword,now,now,
+                    (identifier,run_key,pid,product['productName'],product.get('selectionSource',keyword),now,now,
                      'selected',None,None,None))
                 return identifier, product
         return None, None
@@ -97,14 +97,14 @@ class History:
 
     def save_candidates(self, products, keyword):
         # Store only product fields needed for comparison; never retain tracking URLs.
-        fields = ('productId','productName','productPrice','isRocket','isFreeShipping')
+        fields = ('productId','productName','productPrice','isRocket','isFreeShipping','selectionSource','selectionRank')
         with self.db() as db:
             for product in products:
                 if not str(product.get('productId','')).isdigit():
                     continue
                 safe = {k: product[k] for k in fields if k in product}
                 db.execute('INSERT OR REPLACE INTO candidates VALUES(?,?,?,?)',
-                    (str(product['productId']), keyword, time.time(), json.dumps(safe,ensure_ascii=False)))
+                    (str(product['productId']), product.get('selectionSource',keyword), time.time(), json.dumps(safe,ensure_ascii=False)))
         self.export_html()
 
     def export_html(self, target=None):
