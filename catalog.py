@@ -76,7 +76,11 @@ def collect():
             valid.append({**old,'stale':True,'observedAt':old.get('observedAt',previous_catalog.get('updatedAt'))})
     PUBLIC.mkdir(exist_ok=True)
     from catalog_signals import recommendations
-    result={'updatedAt':now,'products':valid,'recommendations':recommendations(valid),'partial':bool(errors)}
+    from catalog_navigation import enrich_navigation
+    from featured_products import featured_records
+    from publication_history import History
+    numbers=enrich_navigation(valid,previous_catalog,featured_records(History()))
+    result={'productNumbers':numbers,'updatedAt':now,'products':valid,'recommendations':recommendations(valid),'partial':bool(errors)}
     temporary=PUBLIC/'catalog.json.tmp'
     temporary.write_text(json.dumps(result,ensure_ascii=False,indent=2))
     temporary.replace(PUBLIC/'catalog.json')
