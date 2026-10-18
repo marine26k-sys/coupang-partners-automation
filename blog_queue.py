@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 from blog_drafts import compose
 from content_quality import validate_copy
-from content_layout import blog_section, validate_emoji
+from content_layout import blog_section, validate_emoji, mobile_blog_html
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT = ROOT/'artifacts/blog-drafts/queue.sqlite3'
@@ -56,6 +56,7 @@ def prepare(data, now=None):
     for s in formatted:
         markup += '<h2><strong>'+html.escape(s['heading'])+'</strong></h2>'+''.join('<p>'+html.escape(block)+'</p>' for block in s['blocks'])
     markup += '<p><a href="'+html.escape(url,quote=True)+'">'+html.escape(url)+'</a></p>'
+    markup = mobile_blog_html(markup)
     # The browser uploads the verified image AFTER all text, never inside a sentence.
     return {**data, 'text':text, 'html':markup, 'imagePosition':'last', 'status':'ready'}
 

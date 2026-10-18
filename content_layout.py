@@ -30,3 +30,11 @@ def blog_section(heading, body, index):
     if not any(c in heading for c in ALLOWED_EMOJI):heading=['🧺','📌','🔎'][index]+' '+heading
     # Sentence blocks stay separate in the editor rather than one long paragraph.
     return heading, sentences(body)
+
+
+def mobile_blog_html(markup):
+    """Explicit small body text and real empty paragraphs survive editor paste."""
+    markup=re.sub(r'<h2><strong>(.*?)</strong></h2>',r'<p><span style="font-size:16px"><b>\1</b></span></p>',markup)
+    markup=re.sub(r'<p>(?!<span)', '<p><span style="font-size:14px">',markup)
+    markup=re.sub(r'(?<!</span>)</p>', '</span></p>',markup)
+    return markup.replace('</p>','</p><p><br></p>')
