@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from dotenv import dotenv_values
 
@@ -18,6 +18,13 @@ def redact(text, values):
             text = text.replace(value, '[REDACTED]')
     return re.sub(r'(?i)(code|state|access_token|refresh_token|key)=([^\s&]+)',
                   r'\1=[REDACTED]', text)
+
+
+def scheduled_run_key(now):
+    hours = [hour for hour in (9, 13, 18) if hour <= now.hour]
+    if hours:
+        return now.strftime('%Y-%m-%d') + f'-{max(hours):02d}'
+    return (now-timedelta(days=1)).strftime('%Y-%m-%d') + '-18'
 
 
 def main():
@@ -37,9 +44,8 @@ def main():
         if '--check' in sys.argv:
             args.append('--check')
         now = datetime.now(ZoneInfo('Asia/Seoul'))
-        slot = '18' if now.hour >= 18 else '09'
         run_env = {**os.environ, **{k:v for k,v in values.items() if v is not None}}
-        run_env['AUTOMATION_RUN_KEY'] = now.strftime('%Y-%m-%d') + '-' + slot
+        run_env['AUTOMATION_RUN_KEY'] = scheduled_run_key(now)
         result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
                                 timeout=540, env=run_env)
         insights_output = ''

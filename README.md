@@ -145,3 +145,8 @@ Cloudflare 프로젝트 이름: sallim-select. 인증정보나 개인 게시 이
 현재 사이트는 같은 Cloudflare 사이트의 `catalog.json`을 읽습니다. 상품 저장소가 비공개이면 방문자 브라우저에서 GitHub 원본을 읽을 수 없으므로, `CATALOG_CLOUDFLARE_ENABLED=true`일 때 `catalog.py --publish`가 수집 후 Cloudflare Pages로 공개 파일만 직접 배포합니다. Wrangler의 사용자 승인 OAuth 연결을 사용하며 자격 증명은 macOS 키체인에서 관리합니다. 자동화·상품 저장소는 비공개로 유지합니다. 이전 GitHub 원본 직접 읽기 및 오래된 번들로의 자동 대체는 제거했습니다.
 
 배포 파일은 `index.html`, `app.js`, `style.css`, `logo.png`, `catalog.json`, 캐시 설정 `_headers`뿐입니다. `catalog.json`은 캐시하지 않으며 방문 시 최신 자료를 읽습니다. 배포 실패는 보호 로그에 실패로 남기고 이전 공개 배포를 유지합니다. Mac 예약 수집·발행과 연동되며 별도 결제는 없습니다.
+
+
+### 현재 예약 시간: 하루 3회
+
+Threads 자동발행은 매일 한국시간 09:00·13:00·18:00에 각 1개입니다. 기존 Mac LaunchAgent에 오후 1시를 추가했으며, 각 시간별 별도 실행 키로 중복 게시를 방지합니다. 홈페이지 상품·가격 갱신과 카카오 전송도 같은 예약 실행에 포함됩니다. Mac이 깨어 있고 인터넷에 연결돼 있어야 합니다. 이전 문서의 하루 2회 시간보다 이 설정이 우선합니다.

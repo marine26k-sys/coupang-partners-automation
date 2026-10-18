@@ -48,3 +48,15 @@ class LocalRuntimeTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ThreeDailySlotsTests(unittest.TestCase):
+    def test_three_daily_runs_have_distinct_duplicate_keys(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from run_scheduled import scheduled_run_key
+        zone=ZoneInfo('Asia/Seoul')
+        self.assertEqual([scheduled_run_key(datetime(2026,10,18,h,tzinfo=zone)) for h in (9,13,18)],
+                         ['2026-10-18-09','2026-10-18-13','2026-10-18-18'])
+        self.assertEqual(scheduled_run_key(datetime(2026,10,18,12,59,tzinfo=zone)),'2026-10-18-09')
+        self.assertEqual(scheduled_run_key(datetime(2026,10,18,8,59,tzinfo=zone)),'2026-10-17-18')
