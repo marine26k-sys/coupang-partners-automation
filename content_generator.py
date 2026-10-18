@@ -144,6 +144,8 @@ def build_threads_post(copy: str, product_name: str, deeplink: str, observed_fac
         raise ValueError('본문 문구 또는 말투 규칙을 확인하세요.')
     if not deeplink.startswith('https://link.coupang.com/'):
         raise ValueError('본인 제휴 링크가 필요합니다.')
+    from content_quality import validate_copy
+    validate_copy(copy, product_name)
     text = copy+'\n\n'+product_name+(('\n'+observed_fact) if observed_fact else '')+'\n'+deeplink+'\n\n※ '+DISCLOSURE_TEXT
     if len(text)>500:
         raise ValueError('Threads 본문이 500자를 초과했습니다.')

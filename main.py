@@ -119,6 +119,9 @@ def run():
         threads_result = None
         if threads_enabled:
             from threads_api import publish_text, ThreadsError
+            from content_quality import validate_threads_ready
+            from content_generator import DISCLOSURE_TEXT
+            validate_threads_ready(draft, DISCLOSURE_TEXT)
             print('4) Threads 게시 중...')
             stage = 'publication'
             history.update(history_id, 'publishing')
