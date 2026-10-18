@@ -107,9 +107,11 @@ def render(data):
     scheduled={r.get('run_key') for r in successful if r.get('run_key') in {today+f'-{h:02d}' for h in data.get('threadsHours',[])}}
     manual=sum(not r.get('run_key') for r in successful)
     completed=f"{len(scheduled)} / {len(data.get('threadsHours',[]))}"
-    blog_done=sum(r['state']=='published' and str(r['slot']).startswith(today) for r in data['queue'])
+    blog_done=sum(r['state']=='published' and r['slot'] in {today+'-10',today+'-19'} for r in data['queue'])
     manual_blogs={p.get('url') for p in data['legacyBlogs'] if p.get('url') and p.get('status') in {'published_verified','published'}}
-    cards=''.join('<div class="stat"><small>'+title+'</small><strong>'+esc(value)+'</strong><span>'+note+'</span></div>' for title,value,note in [('오늘 Threads 예약 발행',completed,f'예약 완료 / 하루 예약 · 수동·시험 {manual}건 별도'),('오늘 블로그 예약 발행',f'{blog_done} / 2',f'예약 완료 / 하루 예약 · 수동 {len(manual_blogs)}건 누적'),('다음 Threads',data['threadsNext'],'09시 · 13시 · 18시 / 한국시간'),('다음 블로그',data['blogNext'],'10시 쿠팡 · 19시 토스 / 한국시간')])
+    manual_queue_urls={r.get('public_url') for r in data['queue'] if r['state']=='published' and 'manual' in str(r['slot']) and r.get('public_url')}
+    manual_count=len(manual_blogs | manual_queue_urls)
+    cards=''.join('<div class="stat"><small>'+title+'</small><strong>'+esc(value)+'</strong><span>'+note+'</span></div>' for title,value,note in [('오늘 Threads 예약 발행',completed,f'예약 완료 / 하루 예약 · 수동·시험 {manual}건 별도'),('오늘 블로그 예약 발행',f'{blog_done} / 2',f'예약 완료 / 하루 예약 · 수동 {manual_count}건 누적'),('다음 Threads',data['threadsNext'],'09시 · 13시 · 18시 / 한국시간'),('다음 블로그',data['blogNext'],'10시 쿠팡 · 19시 토스 / 한국시간')])
     thread_rows=''
     for r in data['threads']:
         publication=r['publication'];draft=r['draft']

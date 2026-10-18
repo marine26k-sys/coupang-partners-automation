@@ -64,3 +64,23 @@ def run():
 if __name__=='__main__':
     try:run();print('팬트리 비교 초안 생성 완료 · 외부 발행 없음')
     except Exception as exc:print('비교 초안 생성 보류: '+type(exc).__name__);raise SystemExit(1) from None
+
+
+def prepare_comparison_publication(data, now=None):
+    """Separate multi-product gate; never bypass single-product validation."""
+    from urllib.parse import urlparse
+    now=now or datetime.now(timezone.utc)
+    if data.get('kind')!='comparison' or data.get('reviewedByOperator') is not True:
+        raise ValueError('다상품 검토가 필요합니다.')
+    if not 2<=len(data.get('products',[]))<=3:raise ValueError('비교 상품 수를 확인하세요.')
+    for p in data['products']:
+        captured=datetime.fromisoformat(p['observedAt'])
+        if captured.tzinfo is None or not 0<=(now-captured).total_seconds()<=21600:raise ValueError('가격 재확인이 필요합니다.')
+        u=urlparse(p['url'])
+        if u.scheme!='https' or u.hostname!='link.coupang.com' or not p.get('optionKey'):raise ValueError('정확한 옵션의 본인 제휴 링크가 필요합니다.')
+        if not p.get('imageVerified') or not Path(p.get('localImage','')).is_file():raise ValueError('상품별 사진 확인이 필요합니다.')
+        expected=int((Decimal(str(p['price']))/p['quantity']).quantize(Decimal('1'),rounding=ROUND_HALF_UP))
+        if p.get('unitPrice')!=expected or p['url'] not in data.get('text',''):raise ValueError('단가 또는 링크가 일치하지 않습니다.')
+    if '이 게시물은 쿠팡파트너스 활동의 일환으로' not in data.get('text',''):raise ValueError('광고 고지가 필요합니다.')
+    if not data.get('noPerformanceRanking'):raise ValueError('근거 없는 성능 순위를 제외하세요.')
+    return {**data,'status':'ready','provider':'coupang','imagePosition':'last'}

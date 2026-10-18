@@ -55,7 +55,7 @@ def prepare(data, now=None):
     markup = '<p>※ '+html.escape(disclosure)+'</p><p>'+html.escape(product['name'])+'</p>'
     for s in formatted:
         markup += '<h2><strong>'+html.escape(s['heading'])+'</strong></h2>'+''.join('<p>'+html.escape(block)+'</p>' for block in s['blocks'])
-    markup += '<p>'+html.escape(url)+'</p>'
+    markup += '<p><a href="'+html.escape(url,quote=True)+'">'+html.escape(url)+'</a></p>'
     # The browser uploads the verified image AFTER all text, never inside a sentence.
     return {**data, 'text':text, 'html':markup, 'imagePosition':'last', 'status':'ready'}
 
@@ -76,8 +76,13 @@ def connect(path):
 def enqueue(data, slot, path=DEFAULT):
     if not slot or not isinstance(slot, str):
         raise ValueError("예약 시간 식별자가 필요합니다.")
-    payload = prepare(data)
-    key = data['provider']+':'+str(data['product'].get('id') or data['product']['affiliateUrl'])
+    if data.get('kind')=='comparison':
+        from comparison_editorial import prepare_comparison_publication
+        payload=prepare_comparison_publication(data)
+        key='comparison:'+','.join(sorted(p['id']+':'+p['optionKey'] for p in data['products']))
+    else:
+        payload=prepare(data)
+        key = data['provider']+':'+str(data['product'].get('id') or data['product']['affiliateUrl'])
     item_id = hashlib.sha256((slot+key).encode()).hexdigest()[:16]
     with connect(path) as db:
         db.execute('INSERT INTO queue VALUES(?,?,?,?,?,?)',(item_id,slot,key,'ready',json.dumps(payload,ensure_ascii=False),None))
@@ -88,7 +93,12 @@ def claim(item_id, path=DEFAULT):
     with connect(path) as db:
         row = db.execute('SELECT payload FROM queue WHERE id=? AND state=?',(item_id,'ready')).fetchone()
         if not row:raise ValueError('발행 중이거나 처리된 항목은 다시 시작할 수 없습니다.')
-        payload = prepare(json.loads(row[0]))  # revalidate age immediately before editing
+        saved=json.loads(row[0])
+        if saved.get('kind')=='comparison':
+            from comparison_editorial import prepare_comparison_publication
+            payload=prepare_comparison_publication(saved)
+        else:
+            payload=prepare(saved)  # revalidate age immediately before editing
         changed = db.execute("UPDATE queue SET state='publishing' WHERE id=? AND state='ready'",(item_id,)).rowcount
         if not changed:raise ValueError('다른 작업이 이미 발행을 시작했습니다.')
     return payload

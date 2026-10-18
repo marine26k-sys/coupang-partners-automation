@@ -41,3 +41,12 @@ class OperatorTests(unittest.TestCase):
             view=render(data)
             self.assertIn('수동 1건 누적',view)
             self.assertIn('오늘 블로그 예약 발행',view)
+
+    def test_manual_comparison_excluded_from_reserved_count(self):
+        with TemporaryDirectory() as temp:
+            now=datetime(2026,10,18,20,tzinfo=ZoneInfo('Asia/Seoul'))
+            data=snapshot(Path(temp),now)
+            data['queue']=[{'state':'published','slot':slot,'public_url':'https://blog.naver.com/sallim-select/'+str(i),'payload':{}} for i,slot in enumerate(['2026-10-18-manual-comparison','2026-10-18-19'])]
+            view=render(data)
+            self.assertIn('1 / 2',view)
+            self.assertIn('수동 1건 누적',view)
