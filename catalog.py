@@ -45,11 +45,14 @@ def collect():
         for p in products:
             link=by_url.get(p.pop('plain'))
             if not link or not link.startswith('https://link.coupang.com/'): continue
-            p['url']=link;p['priceChange']=None
+            p['url']=link;p['priceChange']=None;p['previousPrice']=None;p['previousDate']=None
             price=p['price']; option=p['option']
             if option and isinstance(price,(int,float)) and price>0:
-                previous=db.execute('SELECT price FROM prices WHERE id=? AND option=? AND day<? ORDER BY day DESC LIMIT 1',(p['id'],option,now[:10])).fetchone()
-                if previous:p['priceChange']=price-previous[0]
+                previous=db.execute('SELECT price,day FROM prices WHERE id=? AND option=? AND day<? ORDER BY day DESC LIMIT 1',(p['id'],option,now[:10])).fetchone()
+                if previous:
+                    p['priceChange']=price-previous[0]
+                    p['previousPrice']=previous[0]
+                    p['previousDate']=previous[1]
                 db.execute('INSERT OR REPLACE INTO prices VALUES(?,?,?,?)',(p['id'],option,now[:10],price))
             image=p['image']
             if image.startswith('//'):p['image']='https:'+image
