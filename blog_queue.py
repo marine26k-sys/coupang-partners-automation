@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 from blog_drafts import compose
 from content_quality import validate_copy
+from content_layout import blog_section, validate_emoji
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT = ROOT/'artifacts/blog-drafts/queue.sqlite3'
@@ -21,6 +22,7 @@ def prepare(data, now=None):
     provider = data['provider']
     base = compose(product, provider)  # validates service and owner verification for Toss
     title = str(data.get('title', '')).strip()
+    validate_emoji(title,0)
     sections = data.get('sections', [])
     if not 8 <= len(title) <= 100 or len(sections) != 3:
         raise ValueError('간결한 제목과 소제목 3개가 필요합니다.')
@@ -34,12 +36,15 @@ def prepare(data, now=None):
     if captured.tzinfo is None or not 0 <= ((now or datetime.now(timezone.utc))-captured).total_seconds() <= 21600:
         raise ValueError('6시간 이내에 상품 정보를 확인해야 합니다.')
     paragraphs = []
-    for section in sections:
+    formatted=[]
+    for index, section in enumerate(sections):
         heading = str(section.get('heading', '')).strip()
         body = str(section.get('body', '')).strip()
         if not heading or len(body) < 30:
             raise ValueError('각 소제목과 충분한 설명이 필요합니다.')
-        paragraphs.extend([heading, body])
+        heading, blocks=blog_section(heading,body,index)
+        formatted.append({'heading':heading,'blocks':blocks})
+        paragraphs.extend([heading, '\n\n'.join(blocks)])
     copy = title+'\n'+'\n'.join(paragraphs)
     validate_copy(copy, evidence)
     if len(copy) < 250 or len(copy) > 2500:
@@ -48,8 +53,8 @@ def prepare(data, now=None):
     url = product['affiliateUrl']
     text = '※ '+disclosure+'\n\n'+product['name']+'\n\n'+'\n\n'.join(paragraphs)+'\n\n'+url
     markup = '<p>※ '+html.escape(disclosure)+'</p><p>'+html.escape(product['name'])+'</p>'
-    for s in sections:
-        markup += '<h2>'+html.escape(s['heading'])+'</h2><p>'+html.escape(s['body']).replace('\n','<br>')+'</p>'
+    for s in formatted:
+        markup += '<h2><strong>'+html.escape(s['heading'])+'</strong></h2>'+''.join('<p>'+html.escape(block)+'</p>' for block in s['blocks'])
     markup += '<p>'+html.escape(url)+'</p>'
     # The browser uploads the verified image AFTER all text, never inside a sentence.
     return {**data, 'text':text, 'html':markup, 'imagePosition':'last', 'status':'ready'}
