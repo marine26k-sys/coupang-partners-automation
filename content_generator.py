@@ -133,7 +133,7 @@ def generate_threads_post(product_name: str, deeplink: str, observed_fact: str =
     model = TextModel(voice + '\n이번 요청은 댓글 없이 본문 한 개로 완결해. '
         '생활 속 불편 하나와 구매 전 확인 기준을 연결한 담백한 반말 2~4문장, 220자 이내. '
         '상품명은 프로그램이 별도 추가하므로 반복하지 마. 댓글 안내·링크 안내·가짜 경험·후기·효능·가격·할인 추정은 금지. '
-        '링크와 고지를 제외한 글만 작성해.')
+        '도입과 선택 기준 사이에는 빈 줄을 넣어 2개의 짧은 문단으로 구분해. 차분하고 구체적으로 쓰고 수식어와 중복 설명은 빼. 링크와 고지를 제외한 글만 작성해.')
     response = model.generate_content('확인된 상품명: '+product_name, {'temperature':0.4})
     return build_threads_post(response.text.strip(), product_name, deeplink, observed_fact)
 
