@@ -67,7 +67,7 @@ def main():
                 catalog_output = '상품 사이트 갱신 시간 초과 (이전 자료 유지)\n'
         growth_output = ''
         if '--check' not in sys.argv:
-            for script in ('growth_analytics.py', 'content_packages.py'):
+            for script in ('growth_analytics.py', 'content_packages.py', 'comparison_editorial.py'):
                 try:
                     extra=subprocess.run([sys.executable,str(ROOT/script)],cwd=ROOT,capture_output=True,text=True,timeout=90,env=run_env)
                     growth_output += script+' exit='+str(extra.returncode)+'\n'+extra.stdout
