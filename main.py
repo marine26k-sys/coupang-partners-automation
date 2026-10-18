@@ -53,11 +53,12 @@ def run():
             return
     print("1) 쿠팡 골드박스·카테고리 베스트 조회 중...")
     from publication_history import History
-    from product_selection import ranked_candidates, apply_observed_signals
+    from product_selection import ranked_candidates, apply_observed_signals, prefer_budget
     history = History()
     client = CoupangPartnersClient()
     products, keyword = ranked_candidates(client, history)
     products = apply_observed_signals(products, history.path.parent/'catalog-prices.sqlite3')
+    products = prefer_budget(products)
     history.save_candidates(products, keyword)
     history_id, product = history.reserve(products, keyword, os.environ.get('AUTOMATION_RUN_KEY'),
                                            int(os.environ.get('PRODUCT_COOLDOWN_DAYS', '30')))

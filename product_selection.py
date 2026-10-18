@@ -61,3 +61,18 @@ def apply_observed_signals(products, database):
         return products
     sources=list(dict.fromkeys(p['selectionSource'] for p in products))
     return sorted(products,key=lambda p:(sources.index(p['selectionSource']),-p.get('observedScore',0),p['selectionRank']))
+
+
+def prefer_budget(products, hour=None):
+    """Rotate affordable editorial themes, preserving evidence order within groups."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    hour = datetime.now(ZoneInfo('Asia/Seoul')).hour if hour is None else hour
+    limit = 10000 if hour < 12 else 30000 if hour < 17 else None
+    if limit is None:
+        return products
+    def fits(product):
+        price = product.get('productPrice')
+        return isinstance(price, (int, float)) and not isinstance(price, bool) and 0 < price <= limit
+    # Fall back to other fresh official-list products when this budget has no eligible stock.
+    return sorted(products, key=lambda product: not fits(product))
