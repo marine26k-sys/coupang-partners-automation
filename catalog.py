@@ -72,6 +72,9 @@ def publish():
     if changed:
         subprocess.run(['git','commit','-m','Refresh public product catalog'],cwd=PUBLIC,check=True,capture_output=True)
     subprocess.run(['git','push','origin','main'],cwd=PUBLIC,check=True,capture_output=True,timeout=60)
+    if os.environ.get('CATALOG_CLOUDFLARE_ENABLED','').lower()=='true':
+        from cloudflare_publish import deploy
+        deploy()
 
 if __name__=='__main__':
     import sys

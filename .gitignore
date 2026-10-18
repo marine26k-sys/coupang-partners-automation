@@ -7,3 +7,5 @@ __pycache__/
 artifacts/
 .env.*
 !.env.example
+
+.wrangler/
