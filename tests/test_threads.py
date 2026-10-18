@@ -96,8 +96,10 @@ class SingleBodyTests(unittest.TestCase):
     def test_body_has_product_link_and_disclosure_without_comment(self):
         from content_generator import build_threads_post, SHORT_DISCLOSURE
         text=build_threads_post('앞으로 당길 공간도 재보고 골라.','슬라이딩 정리함','https://link.coupang.com/a/test')
-        self.assertTrue(text.startswith(SHORT_DISCLOSURE))
-        self.assertTrue(text.endswith(DISCLOSURE_TEXT))
+        self.assertTrue(text.startswith(DISCLOSURE_TEXT))
+        self.assertEqual(text.count(DISCLOSURE_TEXT),1)
+        self.assertNotIn(SHORT_DISCLOSURE,text)
+        self.assertTrue(text.endswith('https://link.coupang.com/a/test'))
         self.assertIn('슬라이딩 정리함',text)
         self.assertIn('https://link.coupang.com/a/test',text)
         self.assertNotIn('댓글',text)
