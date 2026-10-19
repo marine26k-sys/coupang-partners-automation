@@ -102,13 +102,15 @@ def run():
         deeplink = links[0]["shortenUrl"]
 
         print("3) Gemini로 글 생성 중...")
-        daily_post = generate_daily_post(keyword, deeplink)
-        hook_post = generate_hook_and_recommend(
-            product_name=product_name,
-            product_features='(쿠팡 '+keyword+' 목록에서 확인된 상품명·구성 기준)',
-            price=price,
-            deeplink=deeplink,
-        )
+        daily_post = hook_post = ''
+        if kakao_enabled or not threads_enabled:
+            daily_post = generate_daily_post(keyword, deeplink)
+            hook_post = generate_hook_and_recommend(
+                product_name=product_name,
+                product_features='(쿠팡 '+keyword+' 목록에서 확인된 상품명·구성 기준)',
+                price=price,
+                deeplink=deeplink,
+            )
 
         Path("artifacts").mkdir(exist_ok=True)
         draft = {
