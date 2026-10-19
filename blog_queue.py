@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import html
 import json
+import math
 import os
 from pathlib import Path
 import sqlite3
@@ -51,8 +52,20 @@ def prepare(data, now=None):
         raise ValueError('본문 길이는 250~2500자여야 합니다.')
     disclosure = base['text'].split('\n\n')[0]
     url = product['affiliateUrl']
+    price_blocks=[]
+    if product.get('priceVerifiedByOwner') is True:
+        from price_display import price_line
+        price_blocks=[price_line(product.get('price'),product['checkedAt']), '옵션 '+str(product['option'])]
+        if product.get('shippingVerifiedByOwner') is True:
+            shipping=product.get('shipping')
+            if isinstance(shipping,bool) or not isinstance(shipping,(int,float)) or not math.isfinite(shipping) or shipping<0:
+                raise ValueError('배송비 확인이 필요합니다.')
+            price_blocks.append('배송비 무료' if shipping==0 else f'배송비 {shipping:,.0f}원')
+        price_blocks.append('가격·쿠폰·배송 조건은 구매 화면에서 최종 확인해주세요')
+    paragraphs=price_blocks+paragraphs
     text = '※ '+disclosure+'\n\n'+product['name']+'\n\n'+'\n\n'.join(paragraphs)+'\n\n'+url
     markup = '<p>※ '+html.escape(disclosure)+'</p><p>'+html.escape(product['name'])+'</p>'
+    markup += ''.join('<p>'+html.escape(block)+'</p>' for block in price_blocks)
     for s in formatted:
         markup += '<h2><strong>'+html.escape(s['heading'])+'</strong></h2>'+''.join('<p>'+html.escape(block)+'</p>' for block in s['blocks'])
     markup += '<p><a href="'+html.escape(url,quote=True)+'">'+html.escape(url)+'</a></p>'

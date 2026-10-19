@@ -120,7 +120,10 @@ def run():
         }
         draft_path = Path('artifacts/draft.json')
         if threads_enabled:
-            draft['threadsPost'] = generate_threads_post(product_name, deeplink, product.get('observedFact',''))
+            from price_display import add_threads_price
+            draft['threadsPost'] = add_threads_price(
+                generate_threads_post(product_name, deeplink, product.get('observedFact','')),
+                deeplink, draft['productPrice'], draft['priceCapturedAt'])
             draft['publicationFormat'] = 'single'
         draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
         history.update(history_id, 'draft_ready', draft=draft)

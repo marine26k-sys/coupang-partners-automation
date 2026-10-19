@@ -25,3 +25,14 @@ class BlogQueueTests(unittest.TestCase):
             if kind=='age':d['product']['checkedAt']=(datetime.now(timezone.utc)-timedelta(hours=7)).isoformat()
             if kind=='image':d['product']['imageVerifiedByOwner']=False
             with self.assertRaises(ValueError):prepare(d)
+
+    def test_verified_price_is_rendered_separately_from_generated_copy(self):
+        d=self.draft();d['product'].update(price=6360,priceVerifiedByOwner=True,shipping=0,shippingVerifiedByOwner=True)
+        result=prepare(d)
+        self.assertIn('6,360원',result['html'])
+        self.assertIn('배송비 무료',result['text'])
+        self.assertIn('옵션 3개',result['text'])
+        d['product']['priceVerifiedByOwner']=False
+        self.assertNotIn('6,360원',prepare(d)['text'])
+        d['product'].update(priceVerifiedByOwner=True,price=-1)
+        with self.assertRaises(ValueError):prepare(d)
