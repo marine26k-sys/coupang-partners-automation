@@ -134,8 +134,18 @@ def generate_threads_post(product_name: str, deeplink: str, observed_fact: str =
         '생활 속 불편 하나와 구매 전 확인 기준을 연결한 담백한 반말 2~4문장, 220자 이내. '
         '상품명은 프로그램이 별도 추가하므로 반복하지 마. 댓글 안내·링크 안내·가짜 경험·후기·효능·가격·할인 추정은 금지. '
         '도입은 한 줄, 빈 줄 다음 구매 기준 2개를 짧은 항목으로 써. ✅ 📌 🔎 🧺 중 구분용 이모지를 본문 전체 1~2개만 사용해. 차분하고 구체적으로 쓰고 수식어와 중복 설명은 빼. 링크와 고지를 제외한 글만 작성해.')
-    response = model.generate_content('확인된 상품명: '+product_name, {'temperature':0.4})
-    return build_threads_post(response.text.strip(), product_name, deeplink, observed_fact)
+    prompt='확인된 상품명: '+product_name
+    for attempt in range(3):
+        response = model.generate_content(prompt, {'temperature':0.4 if attempt==0 else 0.2})
+        try:
+            return build_threads_post(response.text.strip(), product_name, deeplink, observed_fact)
+        except ValueError:
+            if attempt==2:
+                raise
+            prompt=('확인된 상품명: '+product_name+'\n이전 초안은 로컬 검수에서 탈락했어. '
+                    '상품명에 없는 숫자·단위·치수·효능과 사용 경험을 모두 빼고 새로 작성해. '
+                    '숫자를 쓰지 않고 확인된 상품 종류와 구매할 이유만 짧게 연결해. '
+                    '가격·링크·상품명·광고 고지는 프로그램이 추가하므로 쓰지 마.')
 
 
 def build_threads_post(copy: str, product_name: str, deeplink: str, observed_fact: str = '') -> str:

@@ -119,3 +119,20 @@ class ContainerReadinessTests(unittest.TestCase):
             client.wait_ready('container')
         self.assertEqual(client.request.call_count,2)
         sleep.assert_called_once_with(1)
+
+class GenerationRepairTests(unittest.TestCase):
+    def test_invalid_specs_are_rewritten_before_publishing(self):
+        from unittest.mock import patch
+        from content_generator import generate_threads_post
+        with patch('content_generator.TextModel') as model:
+            model.return_value.generate_content.side_effect=[Mock(text='폭이 99cm라 정리하기 좋아.'),Mock(text='선반에 놓을 정리함을 찾고 있어?\n필요한 개수를 정해봐.')]
+            text=generate_threads_post('정리함','https://link.coupang.com/a/test')
+        self.assertNotIn('99cm',text)
+        self.assertEqual(model.return_value.generate_content.call_count,2)
+    def test_repeated_bad_copy_still_fails_closed(self):
+        from unittest.mock import patch
+        from content_generator import generate_threads_post
+        with patch('content_generator.TextModel') as model:
+            model.return_value.generate_content.return_value=Mock(text='폭이 99cm라 정리하기 좋아.')
+            with self.assertRaises(ValueError):generate_threads_post('정리함','https://link.coupang.com/a/test')
+            self.assertEqual(model.return_value.generate_content.call_count,3)
