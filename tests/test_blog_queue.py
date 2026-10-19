@@ -29,7 +29,9 @@ class BlogQueueTests(unittest.TestCase):
     def test_verified_price_is_rendered_separately_from_generated_copy(self):
         d=self.draft();d['product'].update(price=6360,priceVerifiedByOwner=True,shipping=0,shippingVerifiedByOwner=True)
         result=prepare(d)
-        self.assertIn('6,360원',result['html'])
+        self.assertIn('<b>6,360원</b>',result['html'])
+        self.assertIn('3개 · 무료배송</span><br>',result['html'])
+        self.assertNotIn('<!--verified-price-summary-->',result['html'])
         self.assertIn('배송비 무료',result['text'])
         self.assertIn('옵션 3개',result['text'])
         d['product']['priceVerifiedByOwner']=False

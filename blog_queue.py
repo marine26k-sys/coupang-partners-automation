@@ -65,11 +65,21 @@ def prepare(data, now=None):
     paragraphs=price_blocks+paragraphs
     text = '※ '+disclosure+'\n\n'+product['name']+'\n\n'+'\n\n'.join(paragraphs)+'\n\n'+url
     markup = '<p>※ '+html.escape(disclosure)+'</p><p>'+html.escape(product['name'])+'</p>'
-    markup += ''.join('<p>'+html.escape(block)+'</p>' for block in price_blocks)
+    price_marker='<!--verified-price-summary-->'
+    markup += price_marker if price_blocks else ''
     for s in formatted:
         markup += '<h2><strong>'+html.escape(s['heading'])+'</strong></h2>'+''.join('<p>'+html.escape(block)+'</p>' for block in s['blocks'])
     markup += '<p><a href="'+html.escape(url,quote=True)+'">'+html.escape(url)+'</a></p>'
     markup = mobile_blog_html(markup)
+    if price_blocks:
+        amount, stamp=price_blocks[0].removeprefix('표시가격 ').split(' · ',1)
+        details=product['option']
+        if product.get('shippingVerifiedByOwner') is True:
+            details += ' · '+('무료배송' if product['shipping']==0 else f"배송비 {product['shipping']:,.0f}원")
+        summary=('<p><span style="font-size:16px;color:#193e30"><b>'+html.escape(amount)+'</b></span><br>'
+                 '<span style="font-size:14px">'+html.escape(details)+'</span><br>'
+                 '<span style="font-size:11px;color:#666666">'+html.escape(stamp)+' · 가격·배송 조건은 구매 시 확인</span></p><p><br></p>')
+        markup=markup.replace(price_marker,summary)
     # The browser uploads the verified image AFTER all text, never inside a sentence.
     return {**data, 'text':text, 'html':markup, 'imagePosition':'last', 'status':'ready'}
 
