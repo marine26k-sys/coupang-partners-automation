@@ -136,3 +136,29 @@ class GenerationRepairTests(unittest.TestCase):
             model.return_value.generate_content.return_value=Mock(text='폭이 99cm라 정리하기 좋아.')
             with self.assertRaises(ValueError):generate_threads_post('정리함','https://link.coupang.com/a/test')
             self.assertEqual(model.return_value.generate_content.call_count,3)
+
+
+class SituationPairTests(unittest.TestCase):
+    def test_verified_metadata_moves_to_reply(self):
+        from content_generator import build_threads_post, split_threads_post, DISCLOSURE_TEXT
+        text = build_threads_post('선반 앞에 물건이 쌓일 때', '수납함', 'https://link.coupang.com/a/test')
+        pair = split_threads_post(text, '수납함')
+        self.assertNotIn('https://', pair['body'])
+        self.assertIn('https://link.coupang.com/a/test', pair['reply'])
+        self.assertIn(DISCLOSURE_TEXT, pair['body'])
+        self.assertIn(DISCLOSURE_TEXT, pair['reply'])
+
+    def test_footer_disclosed_pair_is_idempotent(self):
+        from threads_api import publish_pair
+        from content_generator import DISCLOSURE_TEXT
+        pair = {'body': '선반 앞에 물건이 쌓일 때\n\n※ '+DISCLOSURE_TEXT,
+                'reply': '수납함\nhttps://link.coupang.com/a/test\n\n※ '+DISCLOSURE_TEXT}
+        with tempfile.TemporaryDirectory() as folder:
+            client = Mock(user_id='account-1')
+            client.request.side_effect = [{'id':'c1'}, {'id':'p1'}, {'permalink':'u1'},
+                                          {'id':'c2'}, {'id':'p2'}, {'permalink':'u2'}]
+            path = Path(folder)/'posts.sqlite3'
+            publish_pair(pair, 'slot', client, path)
+            publish_pair(pair, 'slot', client, path)
+            self.assertEqual(client.request.call_count, 6)
+            self.assertEqual(client.request.call_args_list[3].args[2]['reply_to_id'], 'p1')

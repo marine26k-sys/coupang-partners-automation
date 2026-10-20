@@ -110,9 +110,9 @@ def published_for_run(user_id, run_key, journal_path=None):
         return dict(row) if row else None
 
 
-def publish_text(text, run_key=None, client=None, journal_path=None, reply_to_id=None):
+def publish_text(text, run_key=None, client=None, journal_path=None, reply_to_id=None, disclosed_root=False):
     from content_generator import DISCLOSURE_TEXT, SHORT_DISCLOSURE
-    is_hook = text.startswith(SHORT_DISCLOSURE)
+    is_hook = text.startswith(SHORT_DISCLOSURE) or (disclosed_root and ("※ "+DISCLOSURE_TEXT) in text.splitlines())
     if not is_hook and (not any(line in (DISCLOSURE_TEXT, '※ '+DISCLOSURE_TEXT) for line in text.splitlines()) or 'https://link.coupang.com/' not in text):
         raise ThreadsError('제휴 고지와 제휴 링크가 있는 글만 게시합니다.')
     if len(text) > 500:
@@ -162,12 +162,12 @@ def publish_text(text, run_key=None, client=None, journal_path=None, reply_to_id
 
 def publish_pair(pair, run_key=None, client=None, journal_path=None):
     from content_generator import DISCLOSURE_TEXT, SHORT_DISCLOSURE
-    if not pair['body'].startswith(SHORT_DISCLOSURE) or not pair['reply'].startswith(DISCLOSURE_TEXT):
+    if not (pair['body'].startswith(SHORT_DISCLOSURE) or ('※ '+DISCLOSURE_TEXT) in pair['body'].splitlines()) or not (pair['reply'].startswith(DISCLOSURE_TEXT) or ('※ '+DISCLOSURE_TEXT) in pair['reply'].splitlines()):
         raise ThreadsError('본문과 댓글의 제휴 고지가 필요합니다.')
     if 'https://link.coupang.com/' not in pair['reply'] or any(len(v)>500 for v in pair.values()):
         raise ThreadsError('댓글 링크 또는 본문·댓글 길이를 확인하세요.')
     client = client or ThreadsClient()
     key = run_key or hashlib.sha256((pair['body']+pair['reply']).encode()).hexdigest()
-    root = publish_text(pair['body'], key, client, journal_path)
+    root = publish_text(pair['body'], key, client, journal_path, disclosed_root=True)
     reply = publish_text(pair['reply'], key+':reply', client, journal_path, reply_to_id=root['post_id'])
     return {**root, 'reply_id': reply['post_id'], 'reply_permalink': reply.get('permalink','')}

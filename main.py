@@ -49,6 +49,16 @@ def run():
         from threads_api import published_for_run
         prior_root = published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY'])
         if prior_root:
+            from publication_history import History
+            from threads_api import publish_pair
+            record = next((r for r in History().records() if r['run_key'] == os.environ['AUTOMATION_RUN_KEY']), None)
+            saved = (record or {}).get('draft') or {}
+            if saved.get('publicationFormat') == 'pair' and not published_for_run(os.environ['THREADS_USER_ID'], os.environ['AUTOMATION_RUN_KEY']+':reply'):
+                from content_quality import validate_threads_ready
+                from content_generator import DISCLOSURE_TEXT
+                validate_threads_ready(saved, DISCLOSURE_TEXT)
+                result = publish_pair(saved['threadsPair'], os.environ['AUTOMATION_RUN_KEY'])
+                History().update(record['id'], 'published', publication=result)
             print('이 예약 시간의 Threads 게시가 이미 완료돼 중복 실행을 건너뜁니다.')
             return
     print("1) 쿠팡 골드박스·카테고리 베스트 조회 중...")
@@ -126,12 +136,14 @@ def run():
             draft['threadsPost'] = add_threads_price(
                 generate_threads_post(product_name, deeplink, product.get('observedFact','')),
                 deeplink, draft['productPrice'], draft['priceCapturedAt'])
-            draft['publicationFormat'] = 'single'
+            from content_generator import split_threads_post
+            draft['threadsPair'] = split_threads_post(draft['threadsPost'], product_name)
+            draft['publicationFormat'] = 'pair'
         draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
         history.update(history_id, 'draft_ready', draft=draft)
         threads_result = None
         if threads_enabled:
-            from threads_api import publish_text, ThreadsError
+            from threads_api import publish_pair, ThreadsError
             from content_quality import validate_threads_ready
             from content_generator import DISCLOSURE_TEXT
             validate_threads_ready(draft, DISCLOSURE_TEXT)
@@ -139,7 +151,7 @@ def run():
             stage = 'publication'
             history.update(history_id, 'publishing')
             try:
-                threads_result = publish_text(draft['threadsPost'], os.environ.get('AUTOMATION_RUN_KEY'))
+                threads_result = publish_pair(draft['threadsPair'], os.environ.get('AUTOMATION_RUN_KEY'))
             except ThreadsError:
                 if kakao_enabled:
                     send_draft_kakao('Threads 자동발행에 실패했습니다. 초안은 저장됐습니다. 게시 여부를 확인해주세요.',

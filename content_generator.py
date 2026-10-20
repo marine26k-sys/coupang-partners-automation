@@ -130,7 +130,7 @@ def build_comment(deeplink: str) -> str:
 def generate_threads_post(product_name: str, deeplink: str, observed_fact: str = '') -> str:
     from pathlib import Path
     voice = (Path(__file__).resolve().parent / 'config/sallim_voice.txt').read_text(encoding='utf-8')
-    model = TextModel(voice + '\n이번 요청은 댓글 없이 본문 한 개로 완결해. '
+    model = TextModel(voice + '\n이번 요청은 첫 댓글에 상품 정보를 붙일 본문 핵심 문장만 작성해. '
         '생활 속 구체적 상황 훅 → 확인된 상품 특징 → 필요한 이유 순서의 담백한 반말 3~4줄, 180자 이내. '
         '상품명은 프로그램이 별도 추가하므로 반복하지 마. 댓글 안내·링크 안내·가짜 경험·후기·효능·가격·할인 추정은 금지. '
         '첫 줄은 한 문장 훅만 쓰고 설명을 붙이지 마. 문단 끝 마침표와 글머리 점을 쓰지 마. 빈 줄로 구분해. 이모지는 필요할 때만 최대 1개. 확인된 구성을 생활의 편의와 연결해. 억지 반전·가짜 후회·일률적인 질문형 끝맺음은 금지. 상품명·가격·링크·고지를 제외한 핵심 문장만 작성해.')
@@ -194,4 +194,17 @@ def generate_threads_pair(product_name: str, deeplink: str) -> dict:
             'reply': DISCLOSURE_TEXT+'\n\n'+reply+'\n\n'+deeplink}
     if any(len(value)>500 for value in pair.values()):
         raise ValueError('Threads 본문 또는 댓글이 500자를 초과했습니다.')
+    return pair
+
+
+def split_threads_post(text, product_name):
+    """Keep verified metadata in the first reply; disclose both parts."""
+    marker = '\n\n' + product_name + '\n'
+    if text.count(marker) != 1:
+        raise ValueError('상품 정보 구분을 확인하세요.')
+    hook, details = text.split(marker, 1)
+    pair = {'body': hook + '\n\n※ ' + DISCLOSURE_TEXT,
+            'reply': product_name + '\n' + details}
+    if any(len(part) > 500 for part in pair.values()):
+        raise ValueError('본문 또는 첫 댓글이 500자를 초과합니다.')
     return pair
