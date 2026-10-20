@@ -131,9 +131,9 @@ def generate_threads_post(product_name: str, deeplink: str, observed_fact: str =
     from pathlib import Path
     voice = (Path(__file__).resolve().parent / 'config/sallim_voice.txt').read_text(encoding='utf-8')
     model = TextModel(voice + '\n이번 요청은 댓글 없이 본문 한 개로 완결해. '
-        '생활 속 불편 하나와 구매 전 확인 기준을 연결한 담백한 반말 2~4문장, 220자 이내. '
+        '생활 속 구체적 상황 훅 → 확인된 상품 특징 → 필요한 이유 순서의 담백한 반말 3~4줄, 180자 이내. '
         '상품명은 프로그램이 별도 추가하므로 반복하지 마. 댓글 안내·링크 안내·가짜 경험·후기·효능·가격·할인 추정은 금지. '
-        '도입은 한 줄, 빈 줄 다음 구매 기준 2개를 짧은 항목으로 써. ✅ 📌 🔎 🧺 중 구분용 이모지를 본문 전체 1~2개만 사용해. 차분하고 구체적으로 쓰고 수식어와 중복 설명은 빼. 링크와 고지를 제외한 글만 작성해.')
+        '첫 줄은 한 문장 훅만 쓰고 설명을 붙이지 마. 문단 끝 마침표와 글머리 점을 쓰지 마. 빈 줄로 구분해. 이모지는 필요할 때만 최대 1개. 확인된 구성을 생활의 편의와 연결해. 억지 반전·가짜 후회·일률적인 질문형 끝맺음은 금지. 상품명·가격·링크·고지를 제외한 핵심 문장만 작성해.')
     prompt='확인된 상품명: '+product_name
     for attempt in range(3):
         response = model.generate_content(prompt, {'temperature':0.4 if attempt==0 else 0.2})

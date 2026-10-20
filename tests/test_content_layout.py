@@ -4,7 +4,7 @@ from content_layout import threads_layout, blog_section,validate_emoji
 class LayoutTests(unittest.TestCase):
     def test_threads_splits_dense_copy(self):
         text=threads_layout('정리함도 놓을 자리가 필요해. 선반 깊이를 먼저 재보자. 구성은 필요한 만큼 골라.')
-        self.assertIn('\n\n✅ ',text);self.assertIn('\n· ',text)
+        self.assertIn('\n\n선반 깊이를 먼저 재보자',text);self.assertNotIn('· ',text);self.assertNotIn('.',text)
     def test_existing_emoji_not_duplicated(self):
         text=threads_layout('선반 앞에서 막히기 전에.\n\n📌 깊이를 재보자.\n· 높이도 확인하자.')
         self.assertEqual(text.count('📌'),1);self.assertNotIn('✅',text)
@@ -14,3 +14,7 @@ class LayoutTests(unittest.TestCase):
     def test_excess_emoji_rejected(self):
         with self.assertRaises(ValueError):validate_emoji('✅✅✅',2)
         with self.assertRaises(ValueError):validate_emoji('🔥 지금',2)
+
+    def test_threads_preserves_decimal_url_and_question(self):
+        result=threads_layout('3.2L가 필요한가?\n· 용량부터 골라.\nhttps://example.com/a.b')
+        self.assertEqual(result,'3.2L가 필요한가?\n\n용량부터 골라\n\nhttps://example.com/a.b')

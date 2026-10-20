@@ -17,12 +17,14 @@ def sentences(text):
 def threads_layout(copy):
     validate_emoji(copy,2)
     lines=sentences(copy)
-    if len(lines)<2:return copy.strip()
-    intro=lines[0]
-    checks=[line.lstrip('·•- ') for line in lines[1:]]
-    if not any(c in copy for c in ALLOWED_EMOJI):checks[0]='✅ '+checks[0].lstrip('·•- ')
-    checks=[line if index==0 or line.startswith(('·','•','✅','📌','🔎','🧺')) else '· '+line for index,line in enumerate(checks)]
-    return intro+'\n\n'+'\n'.join(checks)
+    cleaned=[]
+    for line in lines:
+        line=re.sub(r'^[·•.]\s+', '', line).strip()
+        if not line.startswith(('https://','http://')):
+            line=re.sub(r'[.。]+$', '', line).rstrip()
+        if line:cleaned.append(line)
+    return '\n\n'.join(cleaned)
+
 
 
 def blog_section(heading, body, index):
