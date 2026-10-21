@@ -59,7 +59,7 @@ class ThreadsPairTests(unittest.TestCase):
             client.request.side_effect = [
                 {'id':'root-container'}, {'id':'root-post'}, {'permalink':'root-url'},
                 {'id':'reply-container'}, {'id':'reply-post'}, {'permalink':'reply-url'}]
-            pair = {'body':SHORT_DISCLOSURE+'\n구매 전에 어떤 구성을 확인해?', 'reply':TEXT}
+            pair = {'body':'구매 전에 구성을 먼저 확인해', 'reply':TEXT}
             path = Path(folder)/'posts.sqlite3'
             result = publish_pair(pair,'slot',client,path)
             self.assertEqual(result['reply_id'],'reply-post')
@@ -72,7 +72,7 @@ class ThreadsPairTests(unittest.TestCase):
         from content_generator import SHORT_DISCLOSURE
         client = Mock(user_id='account-1')
         with self.assertRaises(ThreadsError):
-            publish_pair({'body':SHORT_DISCLOSURE+'\n질문', 'reply':'고지 없는 링크'},client=client)
+            publish_pair({'body':'질문', 'reply':'고지 없는 링크'},client=client)
         client.request.assert_not_called()
 
 class BrandVoiceTests(unittest.TestCase):
@@ -145,13 +145,13 @@ class SituationPairTests(unittest.TestCase):
         pair = split_threads_post(text, '수납함')
         self.assertNotIn('https://', pair['body'])
         self.assertIn('https://link.coupang.com/a/test', pair['reply'])
-        self.assertIn(DISCLOSURE_TEXT, pair['body'])
+        self.assertNotIn(DISCLOSURE_TEXT, pair['body'])
         self.assertIn(DISCLOSURE_TEXT, pair['reply'])
 
     def test_footer_disclosed_pair_is_idempotent(self):
         from threads_api import publish_pair
         from content_generator import DISCLOSURE_TEXT
-        pair = {'body': '선반 앞에 물건이 쌓일 때\n\n※ '+DISCLOSURE_TEXT,
+        pair = {'body': '선반 앞에 물건이 쌓일 때',
                 'reply': '수납함\nhttps://link.coupang.com/a/test\n\n※ '+DISCLOSURE_TEXT}
         with tempfile.TemporaryDirectory() as folder:
             client = Mock(user_id='account-1')
@@ -162,3 +162,8 @@ class SituationPairTests(unittest.TestCase):
             publish_pair(pair, 'slot', client, path)
             self.assertEqual(client.request.call_count, 6)
             self.assertEqual(client.request.call_args_list[3].args[2]['reply_to_id'], 'p1')
+
+    def test_formulaic_ai_tone_is_rejected(self):
+        from content_generator import build_threads_post
+        with self.assertRaises(ValueError):
+            build_threads_post('소형 봉투가 필요할 때가 있지?', '소형 봉투', 'https://link.coupang.com/a/test')
