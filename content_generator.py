@@ -136,6 +136,7 @@ def generate_threads_post(product_name: str, deeplink: str, observed_fact: str =
         '상품명은 프로그램이 별도 추가하므로 반복하지 마. 댓글 안내·링크 안내·가짜 경험·후기·효능·가격·할인 추정은 금지. '
         '첫 줄은 한 문장 훅만 쓰고 설명을 붙이지 마. 문단 끝 마침표와 글머리 점을 쓰지 마. 빈 줄로 구분해. 이모지는 필요할 때만 최대 1개. 확인된 구성을 생활의 편의와 연결해. '
         '있지·하지·잖아처럼 말을 거는 어미와 일률적인 질문형 끝맺음은 금지. 상황을 바로 서술하고 해·깔끔해·편해 같은 짧은 평서형으로 끝내. '
+        '본문에 상황을 돕는 이모지를 1~2개 넣고 2개를 넘기지 마. '
         '억지 반전·가짜 후회는 금지. 상품명·가격·링크·고지를 제외한 핵심 문장만 작성해.')
     prompt='확인된 상품명: '+product_name
     for attempt in range(3):
@@ -154,7 +155,8 @@ def generate_threads_post(product_name: str, deeplink: str, observed_fact: str =
 def build_threads_post(copy: str, product_name: str, deeplink: str, observed_fact: str = '') -> str:
     forbidden = ['여러분','해봐라','하시길 바랍니다','진짜','너무','완전','대박','무조건','필수템','인생템','강추','역대급','갓성비','라는 점에서','할 수 있습니다','댓글']
     ai_tone = re.search(r'(?:있지|하지|잖아)\s*[?？.!。]?\s*(?:\n|$)', copy)
-    if not copy or 'http' in copy or any(x in copy for x in forbidden) or ai_tone or '!' in copy:
+    emoji_count = len(re.findall(r'[\U0001F300-\U0001FAFF\u2600-\u27BF]', copy))
+    if not copy or 'http' in copy or any(x in copy for x in forbidden) or ai_tone or '!' in copy or not 1 <= emoji_count <= 2:
         raise ValueError('본문 문구 또는 말투 규칙을 확인하세요.')
     if not deeplink.startswith('https://link.coupang.com/'):
         raise ValueError('본인 제휴 링크가 필요합니다.')
