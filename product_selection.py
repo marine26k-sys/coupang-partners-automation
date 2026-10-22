@@ -6,6 +6,42 @@ SOURCES = {
 }
 BASE='/v2/providers/affiliate_open_api/apis/openapi/v1'
 
+# 골드박스에는 식품·패션·건강용품 등 계정 주제와 무관한 상품이 함께 섞인다.
+# 상품명으로 확인 가능한 범위만 사용하고, 애매한 상품은 게시 후보에서 제외한다.
+HOUSEHOLD_TERMS = (
+    '주방', '키친', '냄비', '팬', '용기', '밀폐', '랩', '종이호일', '키친타월',
+    '수납', '정리', '리빙', '생활', '청소', '세제', '휴지', '화장지', '물티슈',
+    '쓰레기봉투', '기저귀봉투', '마스크', '장갑', '저울', '수건', '바구니',
+    '보관', '걸이', '행주', '위생', '주방용품', '생활용품', '매직캔'
+)
+NON_HOUSEHOLD_TERMS = (
+    '사과', '과일', '콜라', '비타민', '프로틴', '립밤', '폼클렌징', '클렌징',
+    '소파', '가구', '포켓몬', '완구', '장난감', '향수', '샴푸', '화장품'
+)
+
+
+def editorial_candidates(products):
+    """Return only products that can support the household editorial promise.
+
+    Official lists are authoritative for availability and price, but a list
+    membership alone is not evidence that a Goldbox item belongs on this
+    account. Ambiguous titles are held back instead of being guessed into the
+    kitchen/storage/household category.
+    """
+    ready = []
+    for product in products:
+        source = product.get('selectionSource', '')
+        title = str(product.get('productName', '')).strip()
+        if source in ('주방용품 베스트', '생활용품 베스트'):
+            ready.append(product)
+            continue
+        if source == '골드박스':
+            has_household = any(term in title for term in HOUSEHOLD_TERMS)
+            has_excluded = any(term in title for term in NON_HOUSEHOLD_TERMS)
+            if has_household and not has_excluded:
+                ready.append(product)
+    return ready
+
 
 def ranked_candidates(client, history):
     preferred=history.next_keyword(list(SOURCES))

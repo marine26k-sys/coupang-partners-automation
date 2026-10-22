@@ -63,10 +63,14 @@ def run():
             return
     print("1) 쿠팡 골드박스·카테고리 베스트 조회 중...")
     from publication_history import History
-    from product_selection import ranked_candidates, apply_observed_signals, prefer_budget
+    from product_selection import ranked_candidates, apply_observed_signals, prefer_budget, editorial_candidates
     history = History()
     client = CoupangPartnersClient()
     products, keyword = ranked_candidates(client, history)
+    products = editorial_candidates(products)
+    if not products:
+        print('계정 주제에 맞는 주방·수납·생활용품 후보가 없어 이번 발행을 보류합니다.')
+        return
     products = apply_observed_signals(products, history.path.parent/'catalog-prices.sqlite3')
     from growth_analytics import prefer_learned
     try:
