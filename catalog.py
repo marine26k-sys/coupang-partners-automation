@@ -10,6 +10,7 @@ import subprocess
 from urllib.parse import urlparse,parse_qs,urlencode
 from dotenv import load_dotenv
 from coupang_api import CoupangPartnersClient
+from product_selection import editorial_candidates
 
 ROOT=Path(__file__).resolve().parent
 PUBLIC=ROOT.parent/'sallim-select-catalog'
@@ -30,6 +31,10 @@ def collect():
             for p in found:
                 pid=str(p.get('productId',''))
                 if not pid.isdigit() or not p.get('productName'): continue
+                if category == '골드박스' and not editorial_candidates([{
+                    'selectionSource': '골드박스', 'productName': p['productName']
+                }]):
+                    continue
                 query=parse_qs(urlparse(p.get('productUrl','')).query)
                 options={k:query[k][0] for k in ('itemId','vendorItemId') if query.get(k) and query[k][0].isdigit()}
                 plain='https://www.coupang.com/vp/products/'+pid+('?' + urlencode(options) if options else '')
