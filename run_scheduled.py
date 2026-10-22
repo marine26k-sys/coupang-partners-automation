@@ -48,6 +48,16 @@ def main():
         run_env['AUTOMATION_RUN_KEY'] = scheduled_run_key(now)
         result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
                                 timeout=540, env=run_env)
+        value_output = ''
+        # The daily value post runs after the evening product slot and has its
+        # own journal key, so a retry cannot create a duplicate public post.
+        if result.returncode == 0 and now.hour == 21 and '--check' not in sys.argv:
+            try:
+                value = subprocess.run([sys.executable, str(ROOT / 'value_post.py')],
+                    cwd=ROOT, capture_output=True, text=True, timeout=90, env=run_env)
+                value_output = f'정보형 글 exit={value.returncode}\n' + value.stdout + value.stderr
+            except subprocess.TimeoutExpired:
+                value_output = '정보형 글 시간 초과 (게시 상태 확인 필요)\n'
         insights_output = ''
         if '--check' not in sys.argv and run_env.get('THREADS_ENABLED','').lower() == 'true':
             # Read-only collection cannot fail or repeat a public publication.
@@ -80,7 +90,7 @@ def main():
         with log.open('a') as out:
             os.chmod(log, 0o600)
             out.write(f'[{stamp}] exit={result.returncode}\n')
-            out.write(redact(result.stdout + result.stderr + insights_output + catalog_output + growth_output, values) + '\n')
+            out.write(redact(result.stdout + result.stderr + value_output + insights_output + catalog_output + growth_output, values) + '\n')
         if result.returncode:
             print('실행 실패: 보호된 로컬 기록을 확인하세요.')
         else:
