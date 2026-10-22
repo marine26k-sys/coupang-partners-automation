@@ -27,6 +27,27 @@ def scheduled_run_key(now):
     return (now-timedelta(days=1)).strftime('%Y-%m-%d') + '-21'
 
 
+def retryable_generation_key(now):
+    """Return the newest recent pre-publication failure for a safe retry.
+
+    A failed model/API generation has no public container. Publishing and
+    uncertain states are deliberately excluded because their public outcome
+    must be checked before any retry.
+    """
+    try:
+        from publication_history import History
+        cutoff = now.timestamp() - 24 * 3600
+        records = [r for r in History().records()
+                   if r.get('status') == 'generation_failed'
+                   and r.get('run_key')
+                   and isinstance(r.get('created'), (int, float))
+                   and r['created'] >= cutoff]
+        records.sort(key=lambda r: r['created'], reverse=True)
+        return records[0]['run_key'] if records else None
+    except Exception:
+        return None
+
+
 def main():
     os.umask(0o077)
     values = dotenv_values(ROOT / '.env')
@@ -45,7 +66,9 @@ def main():
             args.append('--check')
         now = datetime.now(ZoneInfo('Asia/Seoul'))
         run_env = {**os.environ, **{k:v for k,v in values.items() if v is not None}}
-        run_env['AUTOMATION_RUN_KEY'] = scheduled_run_key(now)
+        scheduled_key = scheduled_run_key(now)
+        retry_key = retryable_generation_key(now)
+        run_env['AUTOMATION_RUN_KEY'] = retry_key or scheduled_key
         result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
                                 timeout=540, env=run_env)
         insights_output = ''
@@ -79,7 +102,8 @@ def main():
         stamp = datetime.now(ZoneInfo('Asia/Seoul')).isoformat(timespec='seconds')
         with log.open('a') as out:
             os.chmod(log, 0o600)
-            out.write(f'[{stamp}] exit={result.returncode}\n')
+            retry_note = f' retry={retry_key}' if retry_key else ''
+            out.write(f'[{stamp}] exit={result.returncode}{retry_note}\n')
             out.write(redact(result.stdout + result.stderr + insights_output + catalog_output + growth_output, values) + '\n')
         if result.returncode:
             print('실행 실패: 보호된 로컬 기록을 확인하세요.')
