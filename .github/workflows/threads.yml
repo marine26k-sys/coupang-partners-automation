@@ -47,6 +47,18 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash' }}
         run: python catalog.py
+      - name: 홈페이지 가격 목록 배포
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '0df18abdcbe310d55d00e5ce0be213ec' }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo 'CLOUDFLARE_API_TOKEN Secret이 없어 홈페이지 배포를 중단합니다.'
+            exit 1
+          fi
+          npx --yes wrangler pages deploy ../sallim-select-catalog \
+            --project-name=sallim-select --branch=main --commit-dirty=true
       - name: 발행 슬롯 계산
         env:
           MANUAL_HOUR: ${{ inputs.hour }}
