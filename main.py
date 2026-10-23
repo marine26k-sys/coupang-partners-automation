@@ -72,6 +72,13 @@ def run():
         print('계정 주제에 맞는 주방·수납·생활용품 후보가 없어 이번 발행을 보류합니다.')
         return
     products = apply_observed_signals(products, history.path.parent/'catalog-prices.sqlite3')
+    if os.environ.get('PRICE_DROP_ONLY', '').lower() == 'true':
+        # Price-drop posts require an observed decrease for the same option;
+        # never infer a discount from a current price without history.
+        products = [p for p in products if p.get('observedFact')]
+        if not products:
+            print('최근 관측 대비 가격이 내려간 생활용품이 없어 추가 발행을 보류합니다.')
+            return
     from growth_analytics import prefer_learned
     try:
         learning=json.loads((history.path.parent/'analytics/learning.json').read_text())

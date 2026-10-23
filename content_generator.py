@@ -164,7 +164,15 @@ def build_threads_post(copy: str, product_name: str, deeplink: str, observed_fac
     from content_layout import threads_layout
     validate_copy(copy, product_name)
     copy = threads_layout(copy)
-    text = copy+'\n\n'+product_name+(('\n'+observed_fact) if observed_fact else '')+'\n'+deeplink+'\n\n※ '+DISCLOSURE_TEXT
+    price_hook = ''
+    if observed_fact:
+        match = re.search(r'관측\s+([\d,]+)원\s*→\s*이번 조회\s+([\d,]+)원', observed_fact)
+        if match:
+            before, current = (int(match.group(1).replace(',', '')), int(match.group(2).replace(',', '')))
+            if before > current:
+                price_hook = f'이전 확인가보다 {before-current:,}원 내려간 상품이라 가격 변동부터 확인했어'
+    body = (price_hook+'\n\n' if price_hook else '') + copy
+    text = body+'\n\n'+product_name+(('\n'+observed_fact) if observed_fact else '')+'\n'+deeplink+'\n\n※ '+DISCLOSURE_TEXT
     if len(text)>500:
         raise ValueError('Threads 본문이 500자를 초과했습니다.')
     return text

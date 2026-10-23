@@ -21,6 +21,11 @@ def redact(text, values):
 
 
 def scheduled_run_key(now):
+    # The daily price-drop post is an additional slot, separate from the
+    # regular editorial slots.  The suffix keeps its history and duplicate
+    # guard independent from the same day's ordinary post.
+    if now.hour == 16:
+        return now.strftime('%Y-%m-%d') + '-16-drop'
     hours = [hour for hour in (9, 13, 18, 21) if hour <= now.hour]
     if hours:
         return now.strftime('%Y-%m-%d') + f'-{max(hours):02d}'
@@ -84,6 +89,7 @@ def main():
             retry_output = (f'재시도 {retry_key} exit={retry_result.returncode}\n'
                             + retry_result.stdout + retry_result.stderr)
         run_env['AUTOMATION_RUN_KEY'] = scheduled_key
+        run_env['PRICE_DROP_ONLY'] = 'true' if scheduled_key.endswith('-drop') else 'false'
         result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
                                 timeout=540, env=run_env)
         insights_output = ''
