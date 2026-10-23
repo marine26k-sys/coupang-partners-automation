@@ -21,7 +21,7 @@ def redact(text, values):
 
 
 def scheduled_run_key(now):
-    hours = [hour for hour in (9, 13, 18, 21) if hour <= now.hour]
+    hours = [hour for hour in (9, 12, 18, 21) if hour <= now.hour]
     if hours:
         return now.strftime('%Y-%m-%d') + f'-{max(hours):02d}'
     return (now-timedelta(days=1)).strftime('%Y-%m-%d') + '-21'
@@ -37,9 +37,13 @@ def retryable_generation_key(now):
     try:
         from publication_history import History
         cutoff = now.timestamp() - 24 * 3600
-        records = [r for r in History().records()
+        all_records = History().records()
+        published_keys = {r.get('run_key') for r in all_records
+                          if r.get('status') == 'published' and r.get('run_key')}
+        records = [r for r in all_records
                    if r.get('status') == 'generation_failed'
                    and r.get('run_key')
+                   and r.get('run_key') not in published_keys
                    and isinstance(r.get('created'), (int, float))
                    and r['created'] >= cutoff]
         records.sort(key=lambda r: r['created'], reverse=True)
