@@ -89,7 +89,7 @@ def apply_observed_signals(products, database):
                 if previous and isinstance(price,(int,float)) and previous[1]>price>0:
                     drop=previous[1]-price
                     p['observedScore']=min(40,drop/previous[1]*200)
-                    p['observedFact']=f"{previous[0]} 같은 판매 옵션 관측 {previous[1]:,.0f}원 → 이번 조회 {price:,.0f}원. 쿠폰·배송비·선택 옵션에 따라 최종 가격은 달라질 수 있어."
+                    p['observedFact']=f"{previous[0]} 같은 판매 옵션 관측 {previous[1]:,.0f}원 → 이번 조회 {price:,.0f}원"
                 rows=db.execute('SELECT day,price FROM prices WHERE id=? AND option=? AND day>=date(?,\'-29 days\') AND day<?',(str(p['productId']),option,today,today)).fetchall()
                 if len(rows)>=2 and isinstance(price,(int,float)) and 0<price<=min(r[1] for r in rows):p['observedScore']+=20
                 category={'주방용품 베스트':'주방','생활용품 베스트':'생활'}.get(p['selectionSource'])
