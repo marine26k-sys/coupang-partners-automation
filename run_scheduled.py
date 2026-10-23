@@ -21,7 +21,7 @@ def redact(text, values):
 
 
 def scheduled_run_key(now):
-    hours = [hour for hour in (9, 12, 18, 21) if hour <= now.hour]
+    hours = [hour for hour in (9, 13, 18, 21) if hour <= now.hour]
     if hours:
         return now.strftime('%Y-%m-%d') + f'-{max(hours):02d}'
     return (now-timedelta(days=1)).strftime('%Y-%m-%d') + '-21'
