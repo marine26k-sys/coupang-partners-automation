@@ -72,7 +72,18 @@ def main():
         run_env = {**os.environ, **{k:v for k,v in values.items() if v is not None}}
         scheduled_key = scheduled_run_key(now)
         retry_key = retryable_generation_key(now)
-        run_env['AUTOMATION_RUN_KEY'] = retry_key or scheduled_key
+        retry_result = None
+        retry_output = ''
+        # Recover an older generation failure in its own run.  Always execute
+        # the current slot afterwards so recovery can never consume today's
+        # scheduled publication.
+        if retry_key and retry_key != scheduled_key:
+            retry_env = {**run_env, 'AUTOMATION_RUN_KEY': retry_key}
+            retry_result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
+                                          timeout=540, env=retry_env)
+            retry_output = (f'재시도 {retry_key} exit={retry_result.returncode}\n'
+                            + retry_result.stdout + retry_result.stderr)
+        run_env['AUTOMATION_RUN_KEY'] = scheduled_key
         result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True,
                                 timeout=540, env=run_env)
         insights_output = ''
@@ -108,7 +119,7 @@ def main():
             os.chmod(log, 0o600)
             retry_note = f' retry={retry_key}' if retry_key else ''
             out.write(f'[{stamp}] exit={result.returncode}{retry_note}\n')
-            out.write(redact(result.stdout + result.stderr + insights_output + catalog_output + growth_output, values) + '\n')
+            out.write(redact(retry_output + result.stdout + result.stderr + insights_output + catalog_output + growth_output, values) + '\n')
         if result.returncode:
             print('실행 실패: 보호된 로컬 기록을 확인하세요.')
         else:
