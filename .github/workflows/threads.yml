@@ -1,0 +1,97 @@
+name: 살림셀렉트 Threads 자동 발행
+
+on:
+  schedule:
+    # 09, 13, 16(가격 하락 전용), 18, 21 KST
+    - cron: '0 0,4,7,9,12 * * *'
+  workflow_dispatch:
+    inputs:
+      hour:
+        description: '한국시간 발행 슬롯 (09/13/16/18/21)'
+        required: false
+        default: '13'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sallim-threads-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: 운영 상태 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            artifacts/publications.sqlite3
+            artifacts/threads.sqlite3
+            artifacts/catalog-prices.sqlite3
+          key: sallim-threads-state-${{ github.run_id }}
+          restore-keys: sallim-threads-state-
+      - run: pip install -r requirements.txt
+      - name: 테스트
+        run: python -m unittest discover -s tests -v
+      - name: 상품 가격 기록 갱신
+        env:
+          COUPANG_ACCESS_KEY: ${{ secrets.COUPANG_ACCESS_KEY }}
+          COUPANG_SECRET_KEY: ${{ secrets.COUPANG_SECRET_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash' }}
+        run: python catalog.py
+      - name: 발행 슬롯 계산
+        env:
+          MANUAL_HOUR: ${{ inputs.hour }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            hour="$MANUAL_HOUR"
+          else
+            hour=$(TZ=Asia/Seoul date +%H)
+          fi
+          day=$(TZ=Asia/Seoul date +%F)
+          suffix="$hour"
+          drop=false
+          if [ "$hour" = "16" ]; then
+            suffix="16-drop"
+            drop=true
+          fi
+          echo "AUTOMATION_RUN_KEY=${day}-${suffix}" >> "$GITHUB_ENV"
+          echo "PRICE_DROP_ONLY=$drop" >> "$GITHUB_ENV"
+      - name: Threads 발행
+        env:
+          AUTOMATION_ENABLED: 'true'
+          THREADS_ENABLED: 'true'
+          KAKAO_ENABLED: 'false'
+          COUPANG_ACCESS_KEY: ${{ secrets.COUPANG_ACCESS_KEY }}
+          COUPANG_SECRET_KEY: ${{ secrets.COUPANG_SECRET_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash' }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_TOKEN_EXPIRES_AT: ${{ secrets.THREADS_TOKEN_EXPIRES_AT }}
+          THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
+        run: python main.py
+      - name: 운영 상태 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            artifacts/publications.sqlite3
+            artifacts/threads.sqlite3
+            artifacts/catalog-prices.sqlite3
+          key: sallim-threads-state-${{ github.run_id }}
+      - name: 실행 기록 보관
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threads-run-${{ github.run_id }}
+          path: artifacts/
+          retention-days: 14

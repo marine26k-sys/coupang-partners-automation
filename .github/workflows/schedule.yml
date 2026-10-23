@@ -7,8 +7,6 @@ on:
         type: choice
         options: [demo, draft, kakao]
         default: demo
-  schedule:
-    - cron: '0 0,9 * * *'
 permissions:
   contents: read
 concurrency:
