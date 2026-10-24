@@ -1,7 +1,7 @@
 """Deploy only the allowlisted public assets; credentials stay in Wrangler storage."""
 import os
-from pathlib import Path
 import shutil
+from pathlib import Path
 import subprocess
 
 ROOT=Path(__file__).resolve().parent
@@ -18,7 +18,9 @@ def prepare(target=None):
 
 def deploy():
     target=prepare()
-    node='/Users/soomin/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node'
+    node=os.environ.get('CLOUDFLARE_NODE') or shutil.which('node')
+    if not node:
+        raise RuntimeError('Node.js 실행 파일을 찾을 수 없습니다')
     cli=ROOT.parent/'deploy-tools/cloudflare/node_modules/wrangler/bin/wrangler.js'
     if not cli.is_file():raise RuntimeError('Cloudflare 배포 도구 설정이 필요합니다.')
     env={**os.environ,'CLOUDFLARE_ACCOUNT_ID':'0df18abdcbe310d55d00e5ce0be213ec','WRANGLER_SEND_METRICS':'false','CI':'true'}
