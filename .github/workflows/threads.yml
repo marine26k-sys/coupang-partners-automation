@@ -3,7 +3,12 @@ name: 살림셀렉트 Threads 자동 발행
 on:
   schedule:
     # 09, 13, 16(가격 하락 전용), 18, 21 KST
-    - cron: '0 0,4,7,9,12 * * *'
+    # 슬롯별 표현식을 분리해 GitHub의 지연 실행에도 원래 슬롯을 식별한다.
+    - cron: '0 0 * * *'
+    - cron: '0 4 * * *'
+    - cron: '0 7 * * *'
+    - cron: '0 9 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:
     inputs:
       hour:
@@ -62,11 +67,19 @@ jobs:
       - name: 발행 슬롯 계산
         env:
           MANUAL_HOUR: ${{ inputs.hour }}
+          SCHEDULE_EXPR: ${{ github.event.schedule }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             hour="$MANUAL_HOUR"
           else
-            hour=$(TZ=Asia/Seoul date +%H)
+            case "$SCHEDULE_EXPR" in
+              '0 0 * * *') hour='09' ;;
+              '0 4 * * *') hour='13' ;;
+              '0 7 * * *') hour='16' ;;
+              '0 9 * * *') hour='18' ;;
+              '0 12 * * *') hour='21' ;;
+              *) echo "알 수 없는 예약 표현식: $SCHEDULE_EXPR" >&2; exit 1 ;;
+            esac
           fi
           day=$(TZ=Asia/Seoul date +%F)
           suffix="$hour"
