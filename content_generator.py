@@ -132,7 +132,7 @@ def generate_threads_post(product_name: str, deeplink: str, observed_fact: str =
     from pathlib import Path
     voice = (Path(__file__).resolve().parent / 'config/sallim_voice.txt').read_text(encoding='utf-8')
     model = TextModel(voice + '\n이번 요청은 첫 댓글에 상품 정보를 붙일 본문 핵심 문장만 작성해. '
-        '생활 속 구체적 상황 훅 → 확인된 상품 특징 → 필요한 이유 순서의 담백한 반말 3~4줄, 180자 이내. '
+        '생활 속 구체적 상황 훅 → 불편이 생기는 장면 → 확인된 상품 디테일 → 필요한 이유 → 구매 전 기준 순서의 담백한 반말 5~7줄, 260자 이내. '
         '상품명은 프로그램이 별도 추가하므로 반복하지 마. 댓글 안내·링크 안내·가짜 경험·후기·효능·가격·할인 추정은 금지. '
         '첫 줄은 한 문장 훅만 쓰고 설명을 붙이지 마. 문단 끝 마침표와 글머리 점을 쓰지 마. 빈 줄로 구분해. 이모지는 필요할 때만 최대 1개. 확인된 구성을 생활의 편의와 연결해. '
         '있지·하지·잖아처럼 말을 거는 어미와 일률적인 질문형 끝맺음은 금지. 상황을 바로 서술하고 해·깔끔해·편해 같은 짧은 평서형으로 끝내. '
@@ -158,6 +158,9 @@ def build_threads_post(copy: str, product_name: str, deeplink: str, observed_fac
     emoji_count = len(re.findall(r'[\U0001F300-\U0001FAFF\u2600-\u27BF]', copy))
     if not copy or 'http' in copy or any(x in copy for x in forbidden) or ai_tone or '!' in copy or not 1 <= emoji_count <= 2:
         raise ValueError('본문 문구 또는 말투 규칙을 확인하세요.')
+    body_lines = [line.strip() for line in copy.splitlines() if line.strip()]
+    if len(body_lines) < 5:
+        raise ValueError('본문은 훅과 선택 이유가 보이도록 5줄 이상 작성해야 합니다.')
     if not deeplink.startswith('https://link.coupang.com/'):
         raise ValueError('본인 제휴 링크가 필요합니다.')
     from content_quality import validate_copy

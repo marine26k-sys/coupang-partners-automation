@@ -95,8 +95,8 @@ class BrandVoiceTests(unittest.TestCase):
 class SingleBodyTests(unittest.TestCase):
     def test_body_has_product_link_and_disclosure_without_comment(self):
         from content_generator import build_threads_post, SHORT_DISCLOSURE
-        text=build_threads_post('🔎 앞으로 당길 공간도 재보고 골라.','슬라이딩 정리함','https://link.coupang.com/a/test')
-        self.assertTrue(text.startswith('🔎 앞으로 당길 공간도 재보고 골라\n'))
+        text=build_threads_post('🔎 앞으로 당길 공간부터 재봐.\n앞에 물건이 막히면 꺼내기 어려워.\n앞뒤 길이를 먼저 비교해.\n필요한 칸 수를 정해 골라.\n선반 깊이와 손잡이 공간을 확인해.','슬라이딩 정리함','https://link.coupang.com/a/test')
+        self.assertTrue(text.startswith('🔎 앞으로 당길 공간부터 재봐\n'))
         self.assertEqual(text.count(DISCLOSURE_TEXT),1)
         self.assertNotIn(SHORT_DISCLOSURE,text)
         self.assertTrue(text.endswith('※ '+DISCLOSURE_TEXT))
@@ -125,7 +125,7 @@ class GenerationRepairTests(unittest.TestCase):
         from unittest.mock import patch
         from content_generator import generate_threads_post
         with patch('content_generator.TextModel') as model:
-            model.return_value.generate_content.side_effect=[Mock(text='폭이 99cm라 정리하기 좋아. 🔎'),Mock(text='선반에 놓을 정리함을 찾고 있어?\n필요한 개수를 정해봐. 🧺')]
+            model.return_value.generate_content.side_effect=[Mock(text='폭이 99cm라 정리하기 좋아. 🔎\n선반 앞에 물건이 쌓여.\n꺼내기 쉽게 두고 싶어.\n구성을 먼저 살펴봐.\n공간에 맞는지 비교해.'),Mock(text='선반에 놓을 정리함을 찾고 있어.\n꺼내기 쉽게 둘 자리를 먼저 봐.\n확인된 구성부터 비교해. 🧺\n필요한 개수만 고르면 돼.\n선반 깊이와 손잡이 공간을 확인해.')]
             text=generate_threads_post('정리함','https://link.coupang.com/a/test')
         self.assertNotIn('99cm',text)
         self.assertEqual(model.return_value.generate_content.call_count,2)
@@ -141,7 +141,7 @@ class GenerationRepairTests(unittest.TestCase):
 class SituationPairTests(unittest.TestCase):
     def test_verified_metadata_moves_to_reply(self):
         from content_generator import build_threads_post, split_threads_post, DISCLOSURE_TEXT
-        text = build_threads_post('🧺 선반 앞에 물건이 쌓일 때', '수납함', 'https://link.coupang.com/a/test')
+        text = build_threads_post('🧺 선반 앞에 물건이 쌓일 때\n꺼내는 동선이 막히기 쉬워.\n앞뒤 길이를 먼저 비교해.\n필요한 칸 수를 정해 골라.\n선반 깊이와 손잡이 공간을 확인해.', '수납함', 'https://link.coupang.com/a/test')
         pair = split_threads_post(text, '수납함')
         self.assertNotIn('https://', pair['body'])
         self.assertIn('https://link.coupang.com/a/test', pair['reply'])
