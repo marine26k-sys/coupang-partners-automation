@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent
 
 class History:
     def __init__(self, path=None):
+        self._default_path = path is None
         self.path = Path(path) if path else ROOT / 'artifacts/publications.sqlite3'
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.db() as db:
@@ -25,6 +26,33 @@ class History:
             db.execute('CREATE TABLE IF NOT EXISTS insight_samples(run_id TEXT,captured REAL,published REAL,metrics TEXT,PRIMARY KEY(run_id,captured))')
             db.execute('CREATE TABLE IF NOT EXISTS candidates(id TEXT PRIMARY KEY,keyword TEXT,captured REAL,product TEXT)')
             db.execute('CREATE TABLE IF NOT EXISTS revisions(id INTEGER PRIMARY KEY,run_id TEXT,created REAL,draft TEXT)')
+        if self._default_path:
+            self._import_publication_seed()
+
+    def _import_publication_seed(self):
+        """Seed the cloud runner with posts made before Actions was enabled."""
+        seed_path = ROOT / 'config/publication_seed.json'
+        try:
+            seed = json.loads(seed_path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            return
+        if not isinstance(seed, list):
+            return
+        now = time.time()
+        with self.db() as db:
+            for item in seed:
+                if not isinstance(item, dict):
+                    continue
+                product_id = str(item.get('productId') or '')
+                product_name = str(item.get('productName') or '')
+                if not product_id.isdigit() or not product_name:
+                    continue
+                run_key = f'seed:{product_id}'
+                if db.execute('SELECT 1 FROM runs WHERE run_key=?', (run_key,)).fetchone():
+                    continue
+                db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+                           (uuid.uuid4().hex, run_key, product_id, product_name,
+                            '기존 게시 이력', now, now, 'published', None, None, None))
 
     @contextmanager
     def db(self):
