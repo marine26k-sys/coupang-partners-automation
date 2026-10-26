@@ -27,4 +27,4 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           npx --yes wrangler pages deploy site \
-            --project-name=sallim-select --branch=main --commit-dirty=true
+            --project-name=sallim-select --commit-dirty=true
