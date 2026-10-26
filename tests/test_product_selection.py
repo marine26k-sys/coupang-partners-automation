@@ -11,7 +11,7 @@ class RankedSelectionTests(unittest.TestCase):
             {'selectionSource': '주방용품 베스트', 'productName': '무인쇄 종이컵'},
         ]
         self.assertEqual([p['productName'] for p in editorial_candidates(products)],
-                         ['글래드 프레스앤씰 매직랩 일반형', '무인쇄 종이컵'])
+                         ['글래드 프레스앤씰 매직랩 일반형'])
 
     def test_source_rotation_and_api_order_are_preserved(self):
         client=Mock();history=Mock();history.next_keyword.return_value='주방용품 베스트'

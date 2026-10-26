@@ -63,7 +63,7 @@ def run():
             return
     print("1) 쿠팡 골드박스·카테고리 베스트 조회 중...")
     from publication_history import History
-    from product_selection import ranked_candidates, apply_observed_signals, prefer_budget, editorial_candidates
+    from product_selection import ranked_candidates, apply_observed_signals, prefer_budget, editorial_candidates, MIN_PRICE_DROP_WON
     history = History()
     client = CoupangPartnersClient()
     products, keyword = ranked_candidates(client, history)
@@ -75,7 +75,8 @@ def run():
     if os.environ.get('PRICE_DROP_ONLY', '').lower() == 'true':
         # Price-drop posts require an observed decrease for the same option;
         # never infer a discount from a current price without history.
-        products = [p for p in products if p.get('observedFact')]
+        products = [p for p in products if p.get('observedFact') and
+                    p.get('previousPrice', 0) - p.get('productPrice', 0) >= MIN_PRICE_DROP_WON]
         if not products:
             print('최근 관측 대비 가격이 내려간 생활용품이 없어 추가 발행을 보류합니다.')
             return

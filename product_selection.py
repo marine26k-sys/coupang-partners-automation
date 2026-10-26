@@ -5,6 +5,7 @@ SOURCES = {
     '생활용품 베스트': '/products/bestcategories/1014',
 }
 BASE='/v2/providers/affiliate_open_api/apis/openapi/v1'
+MIN_PRICE_DROP_WON = 2000
 
 # 골드박스에는 식품·패션·건강용품 등 계정 주제와 무관한 상품이 함께 섞인다.
 # 상품명으로 확인 가능한 범위만 사용하고, 애매한 상품은 게시 후보에서 제외한다.
@@ -16,7 +17,7 @@ HOUSEHOLD_TERMS = (
 )
 NON_HOUSEHOLD_TERMS = (
     '사과', '과일', '콜라', '비타민', '프로틴', '립밤', '폼클렌징', '클렌징',
-    '소파', '가구', '포켓몬', '완구', '장난감', '향수', '샴푸', '화장품'
+    '소파', '가구', '포켓몬', '완구', '장난감', '향수', '샴푸', '화장품', '종이컵'
 )
 
 
@@ -32,6 +33,8 @@ def editorial_candidates(products):
     for product in products:
         source = product.get('selectionSource', '')
         title = str(product.get('productName', '')).strip()
+        if any(term in title for term in NON_HOUSEHOLD_TERMS):
+            continue
         if source in ('주방용품 베스트', '생활용품 베스트'):
             ready.append(product)
             continue
@@ -83,13 +86,15 @@ def apply_observed_signals(products, database):
                 if not option:continue
                 previous=db.execute('SELECT day,price FROM prices WHERE id=? AND option=? AND day<? ORDER BY day DESC LIMIT 1',(str(p['productId']),option,today)).fetchone()
                 price=p.get('productPrice')
+                p['previousPrice'] = previous[1] if previous else None
                 from catalog_guard import price_anomaly
                 p['reviewReason']=price_anomaly(price,previous[1] if previous else None)
                 if p['reviewReason']:continue
                 if previous and isinstance(price,(int,float)) and previous[1]>price>0:
                     drop=previous[1]-price
-                    p['observedScore']=min(40,drop/previous[1]*200)
-                    p['observedFact']=f"{previous[0]} 같은 판매 옵션 관측 {previous[1]:,.0f}원 → 이번 조회 {price:,.0f}원"
+                    if drop >= MIN_PRICE_DROP_WON:
+                        p['observedScore']=min(40,drop/previous[1]*200)
+                        p['observedFact']=f"{previous[0]} 같은 판매 옵션 관측 {previous[1]:,.0f}원 → 이번 조회 {price:,.0f}원"
                 rows=db.execute('SELECT day,price FROM prices WHERE id=? AND option=? AND day>=date(?,\'-29 days\') AND day<?',(str(p['productId']),option,today,today)).fetchall()
                 if len(rows)>=2 and isinstance(price,(int,float)) and 0<price<=min(r[1] for r in rows):p['observedScore']+=20
                 category={'주방용품 베스트':'주방','생활용품 베스트':'생활'}.get(p['selectionSource'])
