@@ -1,0 +1,30 @@
+name: 살림셀렉트 홈페이지 배포
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'catalog/**'
+      - 'content_layout.py'
+      - '.github/workflows/catalog-pages.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 카탈로그 배포
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '0df18abdcbe310d55d00e5ce0be213ec' }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx --yes wrangler pages deploy ../sallim-select-catalog \
+            --project-name=sallim-select --branch=main --commit-dirty=true
