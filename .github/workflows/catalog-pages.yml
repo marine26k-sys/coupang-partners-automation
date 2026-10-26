@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'catalog/**'
+      - 'site/**'
       - 'content_layout.py'
       - '.github/workflows/catalog-pages.yml'
 
@@ -26,5 +26,5 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '0df18abdcbe310d55d00e5ce0be213ec' }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
-          npx --yes wrangler pages deploy ../sallim-select-catalog \
+          npx --yes wrangler pages deploy site \
             --project-name=sallim-select --branch=main --commit-dirty=true
