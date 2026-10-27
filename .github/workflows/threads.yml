@@ -71,6 +71,7 @@ jobs:
         run: |
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             hour="$MANUAL_HOUR"
+            day=$(TZ=Asia/Seoul date +%F)
           else
             case "$SCHEDULE_EXPR" in
               '0 0 * * *') hour='09' ;;
@@ -80,8 +81,17 @@ jobs:
               '0 12 * * *') hour='21' ;;
               *) echo "알 수 없는 예약 표현식: $SCHEDULE_EXPR" >&2; exit 1 ;;
             esac
+            # GitHub may start a scheduled run late, including after midnight KST.
+            # Derive the key from the cron's intended UTC occurrence, not the
+            # runner's current local date, so retries remain attached to that slot.
+            cron_utc_hour=$(printf '%s\n' "$SCHEDULE_EXPR" | awk '{print $2}')
+            scheduled_utc_date=$(date -u +%F)
+            if [ "$(date -u +%H)" -lt "$cron_utc_hour" ]; then
+              scheduled_utc_date=$(date -u -d 'yesterday' +%F)
+            fi
+            scheduled_utc="${scheduled_utc_date} ${cron_utc_hour}:00:00 UTC"
+            day=$(TZ=Asia/Seoul date -d "$scheduled_utc" +%F)
           fi
-          day=$(TZ=Asia/Seoul date +%F)
           suffix="$hour"
           drop=false
           if [ "$hour" = "16" ]; then
