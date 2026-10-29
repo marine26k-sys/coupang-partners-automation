@@ -53,6 +53,7 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash' }}
         run: python catalog.py
       - name: 홈페이지 가격 목록 배포
+        id: pages_deploy
         continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -67,8 +68,11 @@ jobs:
           test -s site/index.html
           test -s site/style.css
           test -s site/app.js
+          test -s site/logo.png
+          test -s site/_headers
           npx --yes wrangler pages deploy site \
             --project-name=sallim-select --commit-dirty=true
+          python scripts/verify_pages_deployment.py
       - name: 발행 슬롯 계산
         env:
           MANUAL_HOUR: ${{ inputs.hour }}
@@ -135,3 +139,12 @@ jobs:
           name: threads-run-${{ github.run_id }}
           path: artifacts/
           retention-days: 14
+      - name: 홈페이지 배포 결과 보고
+        if: always()
+        env:
+          PAGES_DEPLOY_OUTCOME: ${{ steps.pages_deploy.outcome }}
+        run: |
+          if [ "$PAGES_DEPLOY_OUTCOME" != "success" ]; then
+            echo '홈페이지 배포 또는 공개 주소 확인에 실패했습니다.' >&2
+            exit 1
+          fi

@@ -28,3 +28,5 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           npx --yes wrangler pages deploy site \
             --project-name=sallim-select --commit-dirty=true
+      - name: 공개 홈페이지 확인
+        run: python scripts/verify_pages_deployment.py
