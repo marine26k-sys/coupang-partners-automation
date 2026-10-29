@@ -62,8 +62,13 @@ jobs:
             echo 'CLOUDFLARE_API_TOKEN Secret이 없어 홈페이지 배포를 중단합니다.'
             exit 1
           fi
-          npx --yes wrangler pages deploy ../sallim-select-catalog \
-            --project-name=sallim-select --branch=main --commit-dirty=true
+          test -s ../sallim-select-catalog/catalog.json
+          cp ../sallim-select-catalog/catalog.json site/catalog.json
+          test -s site/index.html
+          test -s site/style.css
+          test -s site/app.js
+          npx --yes wrangler pages deploy site \
+            --project-name=sallim-select --commit-dirty=true
       - name: 발행 슬롯 계산
         env:
           MANUAL_HOUR: ${{ inputs.hour }}

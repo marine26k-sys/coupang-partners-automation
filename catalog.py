@@ -21,8 +21,12 @@ def collect():
     now=datetime.now(ZoneInfo('Asia/Seoul')).isoformat(timespec='seconds')
     products=[]; errors=[]
     previous_catalog={}
-    try:previous_catalog=json.loads((PUBLIC/'catalog.json').read_text())
-    except (OSError,ValueError):pass
+    for previous_path in (PUBLIC/'catalog.json', ROOT/'site/catalog.json'):
+        try:
+            previous_catalog=json.loads(previous_path.read_text())
+            break
+        except (OSError,ValueError):
+            continue
     failed_categories=[]
     for category,keyword,endpoint in [('수납','팬트리 정리함',None),('주방','주방용품','/products/bestcategories/1013'),('생활','생활용품','/products/bestcategories/1014'),('골드박스','골드박스','/products/goldbox')]:
         try:
