@@ -4,6 +4,7 @@ Gemini API로 일상글/후킹글을 생성한다.
 
 import os
 import re
+import time
 from google import genai
 from google.genai import types
 
@@ -24,12 +25,28 @@ class TextModel:
 
     def generate_content(self, text, generation_config):
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-        response = client.models.generate_content(
-            model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash"),
-            contents=text,
-            config=types.GenerateContentConfig(system_instruction=self.instruction + FACTUAL_RULES,
-                                               **generation_config),
+        config = types.GenerateContentConfig(
+            system_instruction=self.instruction + FACTUAL_RULES,
+            **generation_config,
         )
+        for attempt in range(4):
+            try:
+                response = client.models.generate_content(
+                    model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash"),
+                    contents=text,
+                    config=config,
+                )
+                break
+            except Exception as error:
+                # Gemini may exhaust its own retries during temporary 429/5xx
+                # load spikes. A small outer retry prevents one transient 503
+                # from consuming the entire publication slot.
+                status = getattr(error, "status_code", None)
+                if status not in {429, 500, 502, 503, 504} or attempt == 3:
+                    raise
+                delay = (5, 15, 30)[attempt]
+                print(f"Gemini 일시 오류(HTTP {status}), {delay}초 후 재시도합니다. ({attempt + 1}/3)")
+                time.sleep(delay)
         if not response.text:
             raise RuntimeError("Gemini가 빈 응답을 반환했습니다.")
         return response

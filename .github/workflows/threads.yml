@@ -1,20 +1,30 @@
 name: 살림셀렉트 Threads 자동 발행
+run-name: "Threads ${{ github.event_name == 'schedule' && github.event.schedule || (inputs.recovery && format('recovery:{0}', inputs.hour) || format('manual:{0}', inputs.hour)) }}"
 
 on:
   schedule:
-    # 09, 13, 16(가격 하락 전용), 18, 21 KST
-    # 슬롯별 표현식을 분리해 GitHub의 지연 실행에도 원래 슬롯을 식별한다.
-    - cron: '0 0 * * *'
-    - cron: '0 4 * * *'
-    - cron: '0 7 * * *'
-    - cron: '0 9 * * *'
-    - cron: '0 12 * * *'
+    # GitHub의 정각 혼잡을 피하도록 KST 발행 시각에서 분 단위로 분산한다.
+    # KST 09:13, 13:17, 16:23(가격 하락 전용), 18:29, 21:37
+    - cron: '13 0 * * *'
+    - cron: '17 4 * * *'
+    - cron: '23 7 * * *'
+    - cron: '29 9 * * *'
+    - cron: '37 12 * * *'
   workflow_dispatch:
     inputs:
       hour:
         description: '한국시간 발행 슬롯 (09/13/16/18/21)'
         required: false
         default: '13'
+      day:
+        description: '복구 발행 날짜 (YYYY-MM-DD, 비우면 오늘)'
+        required: false
+        default: ''
+      recovery:
+        description: '자동 복구 실행'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -76,29 +86,38 @@ jobs:
       - name: 발행 슬롯 계산
         env:
           MANUAL_HOUR: ${{ inputs.hour }}
+          MANUAL_DAY: ${{ inputs.day }}
           SCHEDULE_EXPR: ${{ github.event.schedule }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             hour="$MANUAL_HOUR"
-            day=$(TZ=Asia/Seoul date +%F)
+            day="${MANUAL_DAY:-$(TZ=Asia/Seoul date +%F)}"
+            if ! [[ "$day" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+              echo "잘못된 발행 날짜: $day" >&2
+              exit 1
+            fi
           else
             case "$SCHEDULE_EXPR" in
-              '0 0 * * *') hour='09' ;;
-              '0 4 * * *') hour='13' ;;
-              '0 7 * * *') hour='16' ;;
-              '0 9 * * *') hour='18' ;;
-              '0 12 * * *') hour='21' ;;
+              '13 0 * * *') hour='09' ;;
+              '17 4 * * *') hour='13' ;;
+              '23 7 * * *') hour='16' ;;
+              '29 9 * * *') hour='18' ;;
+              '37 12 * * *') hour='21' ;;
               *) echo "알 수 없는 예약 표현식: $SCHEDULE_EXPR" >&2; exit 1 ;;
             esac
             # GitHub may start a scheduled run late, including after midnight KST.
             # Derive the key from the cron's intended UTC occurrence, not the
             # runner's current local date, so retries remain attached to that slot.
             cron_utc_hour=$(printf '%s\n' "$SCHEDULE_EXPR" | awk '{print $2}')
+            cron_utc_minute=$(printf '%s\n' "$SCHEDULE_EXPR" | awk '{print $1}')
             scheduled_utc_date=$(date -u +%F)
-            if [ "$(date -u +%H)" -lt "$cron_utc_hour" ]; then
+            now_utc_hour=$(date -u +%H)
+            now_utc_minute=$(date -u +%M)
+            if [ "$now_utc_hour" -lt "$cron_utc_hour" ] || \
+              { [ "$now_utc_hour" = "$cron_utc_hour" ] && [ "$now_utc_minute" -lt "$cron_utc_minute" ]; }; then
               scheduled_utc_date=$(date -u -d 'yesterday' +%F)
             fi
-            scheduled_utc="${scheduled_utc_date} ${cron_utc_hour}:00:00 UTC"
+            scheduled_utc="${scheduled_utc_date} ${cron_utc_hour}:${cron_utc_minute}:00 UTC"
             day=$(TZ=Asia/Seoul date -d "$scheduled_utc" +%F)
           fi
           suffix="$hour"
@@ -110,6 +129,8 @@ jobs:
           echo "AUTOMATION_RUN_KEY=${day}-${suffix}" >> "$GITHUB_ENV"
           echo "PRICE_DROP_ONLY=$drop" >> "$GITHUB_ENV"
       - name: Threads 발행
+        id: publish
+        continue-on-error: true
         env:
           AUTOMATION_ENABLED: 'true'
           THREADS_ENABLED: 'true'
@@ -123,6 +144,27 @@ jobs:
           THREADS_TOKEN_EXPIRES_AT: ${{ secrets.THREADS_TOKEN_EXPIRES_AT }}
           THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
         run: python main.py
+      - name: 발행 일시 오류 안전 재시도
+        id: retry
+        if: steps.publish.outcome == 'failure'
+        env:
+          AUTOMATION_ENABLED: 'true'
+          THREADS_ENABLED: 'true'
+          KAKAO_ENABLED: 'false'
+          COUPANG_ACCESS_KEY: ${{ secrets.COUPANG_ACCESS_KEY }}
+          COUPANG_SECRET_KEY: ${{ secrets.COUPANG_SECRET_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash' }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_TOKEN_EXPIRES_AT: ${{ secrets.THREADS_TOKEN_EXPIRES_AT }}
+          THREADS_TOKEN_REFRESHED_AT: ${{ secrets.THREADS_TOKEN_REFRESHED_AT }}
+        run: |
+          echo '같은 예약 키로 한 번 재시도합니다. 이미 게시됐거나 결과가 불확실하면 중복 방지 기록이 재게시를 막습니다.'
+          python main.py
+      - name: 발행 결과 최종 확인
+        if: steps.publish.outcome == 'failure' && steps.retry.outcome != 'success'
+        run: exit 1
       - name: 운영 상태 저장
         if: always()
         uses: actions/cache/save@v4
