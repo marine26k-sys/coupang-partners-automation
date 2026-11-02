@@ -11,6 +11,49 @@ import uuid
 ROOT = Path(__file__).resolve().parent
 
 
+FAMILY_COOLDOWN_DAYS = {
+    '화장지': 7,
+    '기저귀봉투 리필': 7,
+    '세탁세제': 3,
+    '키친타월': 4,
+    '물티슈': 3,
+    '식기세척기 세제': 4,
+    '위생장갑': 4,
+    '프라이팬': 7,
+    '밀폐·보관용기': 5,
+    '롤백·비닐백': 4,
+    '쓰레기봉투': 5,
+}
+
+
+def product_family(name):
+    """Map title variants to a narrow family so near-identical posts rotate."""
+    title = str(name or '').lower().replace(' ', '')
+    if ('기저귀' in title and '봉투' in title) or any(word in title for word in ('매직캔리필', '매직캔호환')):
+        return '기저귀봉투 리필'
+    if any(word in title for word in ('키친타월', '키친타올', '주방타월', '주방타올')):
+        return '키친타월'
+    if any(word in title for word in ('화장지', '롤화장지', '롤티슈', '두루마리휴지')):
+        return '화장지'
+    if '식기세척기' in title and '세제' in title:
+        return '식기세척기 세제'
+    if any(word in title for word in ('세탁세제', '액상세제', '액체세제', '세탁세제캡슐')):
+        return '세탁세제'
+    if '물티슈' in title:
+        return '물티슈'
+    if any(word in title for word in ('위생장갑', '니트릴장갑')):
+        return '위생장갑'
+    if '프라이팬' in title or '후라이팬' in title:
+        return '프라이팬'
+    if any(word in title for word in ('밀폐용기', '보관용기', '반찬통')):
+        return '밀폐·보관용기'
+    if any(word in title for word in ('롤백', '위생팩', '비닐백', '지퍼백')):
+        return '롤백·비닐백'
+    if '쓰레기봉투' in title or '종량제봉투' in title:
+        return '쓰레기봉투'
+    return None
+
+
 class History:
     def __init__(self, path=None):
         self._default_path = path is None
@@ -84,9 +127,21 @@ class History:
                 (now-days*86400,)))
             blocked = {r[0] for r in recent}
             blocked_names = {r[0] for r in db.execute('SELECT product_name FROM runs WHERE created>=? AND status NOT IN (\'generation_failed\',\'deleted\')',(now-days*86400,))}
+            family_history = list(db.execute('''SELECT product_name,created FROM runs
+                WHERE created>=? AND status IN ('selected','draft_ready','publishing',
+                'published','notified','notification_failed','publication_uncertain')''',
+                (now-max(FAMILY_COOLDOWN_DAYS.values())*86400,)))
+            blocked_families = {
+                product_family(row['product_name'])
+                for row in family_history
+                if product_family(row['product_name'])
+                and now-row['created'] < FAMILY_COOLDOWN_DAYS[product_family(row['product_name'])]*86400
+            }
             for product in products:
                 pid = str(product.get('productId') or '')
-                if not pid or pid in blocked or product.get('productName') in blocked_names or not product.get('productName'):
+                family = product_family(product.get('productName'))
+                if (not pid or pid in blocked or product.get('productName') in blocked_names
+                        or not product.get('productName') or family in blocked_families):
                     continue
                 identifier = uuid.uuid4().hex
                 db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?,?,?,?)',
