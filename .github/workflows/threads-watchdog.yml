@@ -35,9 +35,14 @@ jobs:
             const kstDate = (value) => new Intl.DateTimeFormat('en-CA', {
               timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
             }).format(value);
-            // This runs near the end of the KST day; always audit the prior
-            // local calendar day, even if GitHub starts the monitor after midnight.
-            const target = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            // Normally this starts at 23:53 KST and audits the current day.
+            // GitHub can delay scheduled workflows past midnight; in that case
+            // audit the previous KST day until the next 23:53 run begins.
+            const now = new Date();
+            const kstHour = Number(new Intl.DateTimeFormat('en-GB', {
+              timeZone: 'Asia/Seoul', hour: '2-digit', hourCycle: 'h23'
+            }).format(now));
+            const target = kstHour === 23 ? now : new Date(now.getTime() - 24 * 60 * 60 * 1000);
             const day = kstDate(target);
 
             async function recentRuns() {
