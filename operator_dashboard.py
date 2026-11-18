@@ -11,6 +11,7 @@ import plistlib
 import sqlite3
 import tomllib
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 from dotenv import dotenv_values
 
 ROOT=Path(__file__).resolve().parent
@@ -24,6 +25,22 @@ esc=lambda x:html.escape(str(x if x is not None else '미확인'))
 def read_json(path, default=None):
     try:return json.loads(Path(path).read_text())
     except (OSError,ValueError):return default
+
+
+def read_public_catalog(fallback_path):
+    """Prefer the live public catalog so a stale local clone cannot mislead the dashboard."""
+    request=Request('https://sallim-select.pages.dev/catalog.json',headers={'Accept':'application/json','User-Agent':'sallim-operator-dashboard/1'})
+    try:
+        with urlopen(request,timeout=3) as response:
+            if response.status != 200:return read_json(fallback_path,{})
+            payload=response.read(2_000_001)
+        if len(payload)>2_000_000:return read_json(fallback_path,{})
+        value=json.loads(payload)
+        if isinstance(value,dict) and value.get('updatedAt') and isinstance(value.get('products'),list):
+            return value
+    except (OSError,ValueError,TypeError):
+        pass
+    return read_json(fallback_path,{})
 
 
 def rows(path, query):
@@ -88,7 +105,7 @@ def snapshot(root=ROOT, now=None):
         if r['status'] in {'generation_failed','publication_uncertain','publishing'}:issues.append('Threads · '+LABELS[r['status']]+' · '+r['product_name'])
     for r in queue:
         if r['state']=='publishing':issues.append('블로그 · 발행 결과를 확인한 뒤 재시도하세요 · '+str(r['slot']))
-    catalog=read_json(root.parent/'sallim-select-catalog/catalog.json',{})
+    catalog=read_public_catalog(root.parent/'sallim-select-catalog/catalog.json')
     for p in catalog.get('products',[]):
         if p.get('reviewReason'):issues.append('상품 확인 · '+p['name']+' · '+p['reviewReason'])
     try:

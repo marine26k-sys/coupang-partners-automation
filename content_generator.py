@@ -29,24 +29,40 @@ class TextModel:
             system_instruction=self.instruction + FACTUAL_RULES,
             **generation_config,
         )
-        for attempt in range(4):
-            try:
-                response = client.models.generate_content(
-                    model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash"),
-                    contents=text,
-                    config=config,
-                )
+        primary = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+        fallback = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
+        models = list(dict.fromkeys((primary, fallback)))
+        response = None
+        last_error = None
+        for model_index, model_name in enumerate(models):
+            for attempt, delay in enumerate((5, 15, 30)):
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=text,
+                        config=config,
+                    )
+                    break
+                except Exception as error:
+                    # Transient capacity/rate-limit failures get bounded
+                    # backoff, then the same prompt is tried on a fallback model.
+                    status = getattr(error, "status_code", None)
+                    last_error = error
+                    if status not in {429, 500, 502, 503, 504}:
+                        raise
+                    if attempt == 2:
+                        if model_index < len(models) - 1:
+                            print(f"Gemini {model_name} 재시도 소진(HTTP {status}), 대체 모델로 전환합니다.")
+                            break
+                        raise
+                    print(f"Gemini {model_name} 일시 오류(HTTP {status}), {delay}초 후 재시도합니다. ({attempt + 1}/3)")
+                    time.sleep(delay)
+            if response is not None:
+                if model_index:
+                    print(f"Gemini 대체 모델 사용: {model_name}")
                 break
-            except Exception as error:
-                # Gemini may exhaust its own retries during temporary 429/5xx
-                # load spikes. A small outer retry prevents one transient 503
-                # from consuming the entire publication slot.
-                status = getattr(error, "status_code", None)
-                if status not in {429, 500, 502, 503, 504} or attempt == 3:
-                    raise
-                delay = (5, 15, 30)[attempt]
-                print(f"Gemini 일시 오류(HTTP {status}), {delay}초 후 재시도합니다. ({attempt + 1}/3)")
-                time.sleep(delay)
+        if response is None:
+            raise last_error or RuntimeError("Gemini가 응답하지 않았습니다.")
         if not response.text:
             raise RuntimeError("Gemini가 빈 응답을 반환했습니다.")
         return response

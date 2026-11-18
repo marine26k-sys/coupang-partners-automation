@@ -29,7 +29,7 @@ Actions에서 실행 모드 demo/draft/kakao를 선택합니다.
 인증 전에는 예약 실행을 켜지 않습니다.
 GitHub Secrets: COUPANG_ACCESS_KEY, COUPANG_SECRET_KEY, GEMINI_API_KEY,
 KAKAO_REST_API_KEY, KAKAO_REFRESH_TOKEN, 선택 KAKAO_CLIENT_SECRET.
-GitHub Variables: SEARCH_KEYWORDS, 선택 GEMINI_MODEL.
+GitHub Variables: SEARCH_KEYWORDS, 선택 GEMINI_MODEL, 선택 GEMINI_FALLBACK_MODEL.
 GitHub Actions 아티팩트에서 초안 JSON을 받을 수 있습니다.
 대시보드는 로컬에서 `python dashboard.py` 실행 후
 `python -m http.server 8080 --bind 127.0.0.1 --directory docs`로 확인합니다.
@@ -44,7 +44,7 @@ Gemini 키는 Google AI Studio에서 발급합니다.
 실행 중 `artifacts/kakao_authorize.url`의 주소를 브라우저에서 엽니다.
 인증 주소·코드·토큰을 채팅이나 실행 인수에 붙여넣지 마세요.
 카카오 앱은 기존 서비스와 분리한 전용 앱 사용을 권장합니다.
-Gemini 기본 모델은 실제 호출로 검증한 `gemini-3.5-flash`이며 `GEMINI_MODEL`로 변경할 수 있습니다.
+Gemini 기본 모델은 `gemini-3.5-flash`이며 `GEMINI_MODEL`로 변경할 수 있습니다. 429·5xx 과부하가 계속되면 `GEMINI_FALLBACK_MODEL`(기본 `gemini-3.5-flash-lite`)로 전환합니다.
 
 생성 글은 입력에 없는 사용 경험·효능·후기를 꾸며내지 않도록 지시하며,
 제휴 고지는 본문에 프로그램으로 추가합니다. 생성 결과의 사실 여부는 게시 전 확인해야 합니다.
@@ -151,7 +151,7 @@ Cloudflare 프로젝트 이름: sallim-select. 인증정보나 개인 게시 이
 
 Threads는 GitHub Actions에서 매일 한국시간 09:13·13:17·18:29·21:37에 정규 발행을 시도하고, 16:23에는 직전 관측보다 2,000원 이상 내려간 생활용품이 있을 때만 추가 발행합니다. Mac이 꺼져 있어도 실행됩니다. 정각 혼잡을 피하도록 예약 분을 분산했습니다. Gemini의 일시적인 429·5xx 응답은 제한된 지수 간격으로 재시도하고, 발행 작업도 같은 예약 키로 한 번 더 시도합니다. 게시 또는 게시 여부가 불확실한 예약은 Threads 발행 이력이 재게시를 차단합니다.
 
-매일 23:53 KST의 복구 작업은 당일 예약 실행이 누락되거나 실패한 슬롯을 확인해 한 번씩 순차 복구합니다. 같은 날 해당 슬롯의 자동 복구를 이미 시도했으면 반복하지 않습니다. 가격 하락 조건을 만족한 상품이 없었던 슬롯은 정상적으로 보류 처리되며 복구하지 않습니다. GitHub 예약 실행은 지연·누락될 수 있어 복구 작업까지 포함한 운영입니다. 실행 결과는 저장소 Actions 기록에서 확인합니다.
+복구 작업은 두 시간마다 최근 이틀의 예약 실행을 확인합니다. 실패·누락 슬롯은 30분 유예 뒤 복구하며, 한 슬롯을 최대 두 번, 슬롯별 복구 간격은 최소 두 시간으로 제한합니다. 발행 성공·진행 중·가격 하락 조건 미충족 슬롯은 다시 발행하지 않습니다. 게시 결과가 불확실한 경우 기존 중복 방지 절차가 재게시를 막습니다. 실행 결과는 저장소 Actions 기록에서 확인합니다.
 
 
 ### Threads 상품 선정: 골드박스·카테고리 베스트

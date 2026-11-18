@@ -1,9 +1,9 @@
 name: Threads 예약 누락 복구
 
 on:
-  # KST 23:53. 당일 예약 실행이 누락되거나 실패했을 때 슬롯별로 한 번 복구한다.
+  # KST 홀수 시각 :53마다 지난 예약 슬롯을 확인해 안전하게 복구한다.
   schedule:
-    - cron: '53 14 * * *'
+    - cron: '53 */2 * * *'
 
 permissions:
   actions: write
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - name: 당일 누락 슬롯 확인 및 순차 복구
+      - name: 최근 누락 슬롯 확인 및 순차 복구
         uses: actions/github-script@v7
         with:
           script: |
@@ -35,15 +35,22 @@ jobs:
             const kstDate = (value) => new Intl.DateTimeFormat('en-CA', {
               timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
             }).format(value);
-            // Normally this starts at 23:53 KST and audits the current day.
-            // GitHub can delay scheduled workflows past midnight; in that case
-            // audit the previous KST day until the next 23:53 run begins.
             const now = new Date();
-            const kstHour = Number(new Intl.DateTimeFormat('en-GB', {
-              timeZone: 'Asia/Seoul', hour: '2-digit', hourCycle: 'h23'
-            }).format(now));
-            const target = kstHour === 23 ? now : new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            const day = kstDate(target);
+            const today = kstDate(now);
+            const yesterday = kstDate(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+            const auditDays = [yesterday, today];
+            const slotTime = (day, hour, minute) => {
+              const [year, month, date] = day.split('-').map(Number);
+              return Date.UTC(year, month - 1, date, Number(hour) - 9, Number(minute));
+            };
+            const due = (day, hour, minute) => now.getTime() >= slotTime(day, hour, minute) + 30 * 60 * 1000;
+            const scheduledDay = (run, cron) => {
+              const [minute, hour] = cron.split(' ').map(Number);
+              const created = new Date(run.created_at);
+              const occurrence = new Date(Date.UTC(created.getUTCFullYear(), created.getUTCMonth(), created.getUTCDate(), hour, minute));
+              if (created < occurrence) occurrence.setUTCDate(occurrence.getUTCDate() - 1);
+              return kstDate(occurrence);
+            };
 
             async function recentRuns() {
               const { data } = await github.rest.actions.listWorkflowRuns({
@@ -53,15 +60,21 @@ jobs:
             }
 
             let runs = await recentRuns();
-            for (const slot of slots) {
+            let dispatchesThisRun = 0;
+            for (const day of auditDays) {
+              for (const slot of slots) {
+              const [slotMinute] = slot.cron.split(' ').map(Number);
+              if (!due(day, slot.hour, slotMinute)) continue;
               const scheduled = runs.filter(run => run.event === 'schedule'
                 && run.display_title.includes(slot.cron)
-                && kstDate(new Date(run.created_at)) === day)
+                && scheduledDay(run, slot.cron) === day)
                 .sort((a, b) => b.created_at.localeCompare(a.created_at));
-              const recoveryTitle = `recovery:${slot.hour}`;
+              const recoveryTitle = `recovery:${day}:${slot.hour}`;
               const recovery = runs.filter(run => run.event === 'workflow_dispatch'
-                && run.display_title.includes(recoveryTitle)
-                && kstDate(new Date(run.created_at)) === day)
+                && (run.display_title.includes(recoveryTitle)
+                  || (run.display_title.includes(`recovery:${slot.hour}`)
+                    && new Date(run.created_at).getTime() >= slotTime(day, slot.hour, slotMinute) + 30 * 60 * 1000
+                    && new Date(run.created_at).getTime() <= slotTime(day, slot.hour, slotMinute) + 36 * 60 * 60 * 1000)))
                 .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
               if (scheduled.some(run => run.status !== 'completed')) {
@@ -72,18 +85,36 @@ jobs:
                 core.info(`${slot.hour}시: 예약 실행 성공 기록이 있어 복구하지 않습니다.`);
                 continue;
               }
-              if (recovery.length) {
-                core.info(`${slot.hour}시: 오늘 자동 복구 실행 기록이 있어 다시 실행하지 않습니다.`);
+              if (recovery.some(run => run.status !== 'completed')) {
+                core.info(`${day} ${slot.hour}시: 복구 실행이 진행 중이라 기다립니다.`);
                 continue;
               }
+              if (recovery.some(run => run.conclusion === 'success')) {
+                core.info(`${day} ${slot.hour}시: 복구 성공 기록이 있어 재실행하지 않습니다.`);
+                continue;
+              }
+              if (recovery.length >= 2) {
+                core.info(`${day} ${slot.hour}시: 복구 한도 2회에 도달했습니다.`);
+                continue;
+              }
+              const latestRecovery = recovery[0];
+              if (latestRecovery && Date.now() - new Date(latestRecovery.created_at).getTime() < 2 * 60 * 60 * 1000) {
+                core.info(`${day} ${slot.hour}시: 직전 복구 후 2시간이 지나지 않아 기다립니다.`);
+                continue;
+              }
+              if (dispatchesThisRun >= 4) {
+                core.info('이번 감시 주기의 복구 실행은 4건으로 제한합니다. 나머지는 다음 확인 주기에 처리합니다.');
+                return;
+              }
 
-              core.warning(`${slot.hour}시 슬롯에 성공한 예약 실행이 없어 한 번 복구합니다.`);
+              core.warning(`${day} ${slot.hour}시 슬롯에 성공 기록이 없어 복구를 시도합니다.`);
               const startedAt = new Date(Date.now() - 5000).toISOString();
               const { data: repository } = await github.rest.repos.get({ owner, repo });
               await github.rest.actions.createWorkflowDispatch({
                 owner, repo, workflow_id: workflow, ref: repository.default_branch,
                 inputs: { hour: slot.hour, day, recovery: 'true' }
               });
+              dispatchesThisRun += 1;
 
               const deadline = Date.now() + 20 * 60 * 1000;
               let dispatched = null;
@@ -104,5 +135,6 @@ jobs:
                 core.warning(`${slot.hour}시 복구 실행도 실패했습니다: ${dispatched.html_url}`);
               } else {
                 core.info(`${slot.hour}시 복구 실행 완료: ${dispatched.html_url}`);
+              }
               }
             }
