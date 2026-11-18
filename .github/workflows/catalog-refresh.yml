@@ -1,0 +1,67 @@
+name: 살림셀렉트 카탈로그 독립 갱신
+
+on:
+  # Threads/Gemini 게시 흐름과 분리한 하루 네 번의 상품 목록 갱신 (KST 05:41·11:41·17:41·23:41)
+  schedule:
+    - cron: '41 2,8,14,20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sallim-threads-publish
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: repo/requirements.txt
+      - name: 가격 이력 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: repo/artifacts/catalog-prices.sqlite3
+          key: sallim-threads-state-${{ github.run_id }}
+          restore-keys: sallim-threads-state-
+      - name: 의존성 설치
+        working-directory: repo
+        run: pip install -r requirements.txt
+      - name: 상품 카탈로그 수집
+        working-directory: repo
+        env:
+          COUPANG_ACCESS_KEY: ${{ secrets.COUPANG_ACCESS_KEY }}
+          COUPANG_SECRET_KEY: ${{ secrets.COUPANG_SECRET_KEY }}
+          PUBLIC_CATALOG_DIR: ${{ github.workspace }}/repo/site
+        run: python catalog.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cloudflare Pages 배포 및 공개 확인
+        working-directory: repo
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '0df18abdcbe310d55d00e5ce0be213ec' }}
+          WRANGLER_SEND_METRICS: 'false'
+          CI: 'true'
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -s site/catalog.json
+          test -s site/_headers
+          npx --yes wrangler pages deploy site \
+            --project-name=sallim-select --commit-dirty=true
+          python scripts/verify_pages_deployment.py
+      - name: 가격 이력 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: repo/artifacts/catalog-prices.sqlite3
+          key: sallim-threads-state-${{ github.run_id }}

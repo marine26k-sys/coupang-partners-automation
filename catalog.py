@@ -13,10 +13,11 @@ from coupang_api import CoupangPartnersClient
 from product_selection import editorial_candidates
 
 ROOT=Path(__file__).resolve().parent
-PUBLIC=ROOT.parent/'sallim-select-catalog'
+PUBLIC=Path(os.environ.get('PUBLIC_CATALOG_DIR',str(ROOT.parent/'sallim-select-catalog')))
 
 def collect():
     load_dotenv(ROOT/'.env')
+    PUBLIC.mkdir(parents=True,exist_ok=True)
     client=CoupangPartnersClient()
     now=datetime.now(ZoneInfo('Asia/Seoul')).isoformat(timespec='seconds')
     products=[]; errors=[]
