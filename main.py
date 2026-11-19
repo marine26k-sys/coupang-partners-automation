@@ -70,7 +70,7 @@ def run():
     products = editorial_candidates(products)
     if not products:
         print('계정 주제에 맞는 주방·수납·생활용품 후보가 없어 이번 발행을 보류합니다.')
-        return
+        raise SystemExit(2)
     products = apply_observed_signals(products, history.path.parent/'catalog-prices.sqlite3')
     if os.environ.get('PRICE_DROP_ONLY', '').lower() == 'true':
         # Price-drop posts require an observed decrease for the same option;
@@ -79,7 +79,7 @@ def run():
                     p.get('previousPrice', 0) - p.get('productPrice', 0) >= MIN_PRICE_DROP_WON]
         if not products:
             print('최근 관측 대비 가격이 내려간 생활용품이 없어 추가 발행을 보류합니다.')
-            return
+            raise SystemExit(2)
     from growth_analytics import prefer_learned
     try:
         learning=json.loads((history.path.parent/'analytics/learning.json').read_text())
@@ -94,7 +94,7 @@ def run():
                                            int(os.environ.get('PRODUCT_COOLDOWN_DAYS', '30')))
     if product is None:
         print('검색된 상품이 모두 최근 게시·선택 이력에 있어 이번 실행은 건너뜁니다.')
-        return
+        raise SystemExit(2)
     keyword = product['selectionSource']
     stage = 'generation'
     try:
