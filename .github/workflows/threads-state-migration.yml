@@ -1,0 +1,47 @@
+name: Threads 발행 이력 캐시 이전
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: '전체 운영 이력이 보존된 Threads 실행 ID'
+        required: true
+        default: '44479303215'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: sallim-threads-publish
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - name: 전체 발행 이력 아티팩트 가져오기
+        uses: actions/download-artifact@v4
+        with:
+          name: threads-run-${{ inputs.source_run_id }}
+          path: seed
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: 이력 파일 확인
+        run: |
+          mkdir -p repo/artifacts
+          for file in publications.sqlite3 threads.sqlite3 catalog-prices.sqlite3; do
+            test -s "seed/$file"
+            cp "seed/$file" "repo/artifacts/$file"
+          done
+      - name: 새 전체 이력 캐시 저장
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            repo/artifacts/publications.sqlite3
+            repo/artifacts/threads.sqlite3
+            repo/artifacts/catalog-prices.sqlite3
+          key: sallim-threads-state-v2-seed-${{ inputs.source_run_id }}

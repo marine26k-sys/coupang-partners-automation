@@ -50,8 +50,16 @@ jobs:
             artifacts/publications.sqlite3
             artifacts/threads.sqlite3
             artifacts/catalog-prices.sqlite3
-          key: sallim-threads-state-${{ github.run_id }}
-          restore-keys: sallim-threads-state-
+          key: sallim-threads-state-v2-${{ github.run_id }}
+          restore-keys: sallim-threads-state-v2-
+      - name: 최신 가격 이력 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: artifacts/catalog-prices.sqlite3
+          key: sallim-catalog-prices-${{ github.run_id }}
+          restore-keys: |
+            sallim-catalog-prices-
+            sallim-threads-state-v2-
       - run: pip install -r requirements.txt
       - name: 테스트
         run: python -m unittest discover -s tests -v
@@ -176,7 +184,7 @@ jobs:
             artifacts/publications.sqlite3
             artifacts/threads.sqlite3
             artifacts/catalog-prices.sqlite3
-          key: sallim-threads-state-${{ github.run_id }}
+          key: sallim-threads-state-v2-${{ github.run_id }}
       - name: 실행 기록 보관
         if: always()
         uses: actions/upload-artifact@v4
