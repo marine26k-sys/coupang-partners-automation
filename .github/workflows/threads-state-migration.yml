@@ -37,6 +37,21 @@ jobs:
             test -s "seed/$file"
             cp "seed/$file" "repo/artifacts/$file"
           done
+      - name: 이전 게시 이력의 임시 날짜 보정
+        run: |
+          python - <<'PY'
+          import sqlite3, time
+          path = 'repo/artifacts/publications.sqlite3'
+          db = sqlite3.connect(path)
+          cutoff = time.time() - 31 * 86400
+          db.execute("""UPDATE runs SET created=?, updated=?
+                       WHERE run_key LIKE 'seed:%' AND publication IS NULL""",
+                     (cutoff, cutoff))
+          changed = db.execute("SELECT changes()").fetchone()[0]
+          db.commit()
+          print(f"기존 이력 {changed}건의 임시 날짜 보정 완료")
+          db.close()
+          PY
       - name: 새 전체 이력 캐시 저장
         uses: actions/cache/save@v4
         with:
