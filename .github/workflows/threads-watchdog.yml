@@ -1,9 +1,9 @@
 name: Threads 예약 누락 복구
 
 on:
-  # KST 홀수 시각 :53마다 지난 예약 슬롯을 확인해 안전하게 복구한다.
+  # 30분마다 지난 예약 슬롯을 확인해 안전하게 복구한다.
   schedule:
-    - cron: '53 */2 * * *'
+    - cron: '23,53 * * * *'
 
 permissions:
   actions: write
