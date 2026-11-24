@@ -23,12 +23,15 @@ FAMILY_COOLDOWN_DAYS = {
     '밀폐·보관용기': 5,
     '롤백·비닐백': 4,
     '쓰레기봉투': 5,
+    '방한장갑': 7,
 }
 
 
 def product_family(name):
     """Map title variants to a narrow family so near-identical posts rotate."""
     title = str(name or '').lower().replace(' ', '')
+    if '방한' in title and '장갑' in title:
+        return '방한장갑'
     if ('기저귀' in title and '봉투' in title) or any(word in title for word in ('매직캔리필', '매직캔호환')):
         return '기저귀봉투 리필'
     if any(word in title for word in ('키친타월', '키친타올', '주방타월', '주방타올')):
